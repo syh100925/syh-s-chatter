@@ -1,0 +1,140 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>syh's chatter</title>
+    <link rel="shortcut icon" href="static/icon.png" type="image/x-icon">
+    <style>
+        #body {
+            /* background-image: url('https://imgsa.baidu.com/forum/pic/item/63395bb5c9ea15ce89ebfa8bbd003af33a87b229.jpg'); */
+            background-color: rgba(15, 15, 15, 1);
+            width: 1675px;
+            padding: 50px;
+        }
+
+        #top-bar {
+            width: 1575px;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: center;
+            border: 3px solid orange;
+            background-color: rgba(0, 0, 0, 0.75);
+        }
+
+        #chat {
+            width: 1575px;
+            margin: auto;
+            text-align: center;
+            border-top: 1px solid white;
+            border-bottom: 1px solid white;
+            padding: 0px;
+            line-height: 100%;
+        }
+    </style>
+</head>
+
+<body id="body">
+    <!--
+    <div id="top-bar">
+        <p style="color: white; text-align: left;">--     syh的聊天室<span style="display: block; text-align: right;"><a href="http://{{ self_ip }}/logout?username={{ username }}"><img src="static/logout.png"></img></a></span></p>
+        <p style="color: white; text-align: center; font-size: 20px;">欢迎，{{ username }}</p>
+    </div>
+
+    <br>
+    -->
+
+    <p style="padding-left: 50px; color: white; text-align: left; font-size: 10px; font-family: 黑体; text-shadow: 0 0 20px white; font-weight: bold;">chatter boot complate</p>
+    <div id="chat">
+        <div style="padding-left: 10px;"><p style="color: white; text-align: left; font-size: 30px; font-family: 黑体; text-shadow: 0 0 20px white; font-weight: bold;">syh's chatter</p></div>
+        <div style="padding-left: 10px; padding-right: 10px;"><div style="border-top: 2px solid white; width: 1555px;"></div></div>
+        <br>
+
+        <!-- <img src="static/已认证.png"> -->
+
+        <div style="padding-left: 30px; padding-right: 30px;">
+        <p style="color: red; text-align: left">[聊天室]: <span style="color: white; font-family: 黑体; text-shadow: 0 0 20px white;">IP chekced...... </span></p>
+
+        {% for i in range(20) %}
+            <div id={{ i }}>
+            <br>
+            </div>
+        {% endfor %}
+
+        <div style="border-top: 2px solid white; width: 1515px;"></div>
+        <p style="padding-left: 50px; color: white; text-align: right; font-size: 10px; font-family: 黑体; text-shadow: 0 0 20px white; font-weight: bold;">username: {{ username }}</p>
+        <br>
+
+        <form action="/chat-new?update={{ update }}" method="post">
+            <lable style="color: white; font-size: 25px; font-family: 黑体; text-shadow: 0 0 20px white;" for="upload_value">发言内容 --> </lable>
+            <input type="text" name="upload_value" style="color: black; font-size: 25px;" id="text_editor" value={{ text }}>
+            <br>
+            <br>
+            <input type="submit" value="确认上传内容" style="font-size: 25px; /* background: url('static/upload_button.png'); */width: 382px; height: 57px; color: white; background-color: rgba(0, 0, 0, 0); font-family: 黑体; text-shadow: 0 0 20px white; border-top: 2px solid white; border-bottom: 2px solid white; border-left: 0px; border-right: 0px;">
+        </form>
+
+        <br>
+
+        <form method="POST" action="/chat_file?update={{ update }}" enctype="multipart/form-data">
+            <p style="color: white; text-align: center;"><span>
+                <lable style="color: white; font-size: 25px; font-family: 黑体; text-shadow: 0 0 20px white;" for="file">上传文件 --></label>
+                <input type="file" name="file" style="border: 0px; color: white;">
+            </span></p>
+            <p style="text-align: center;"><input type="submit" value="确认上传文件" style="font-size: 25px; /* background: url('static/upload_button.png'); */width: 382px; height: 57px; color: white; background-color: rgba(0, 0, 0, 0); font-family: 黑体; text-shadow: 0 0 20px white; border-top: 2px solid white; border-bottom: 2px solid white; border-left: 0px; border-right: 0px;"></p>
+        </form>
+
+        <br>
+        <br>
+        
+        </div>
+
+        <script>
+            setInterval(update, 1 * 1000);
+            setInterval(login, 5 * 60 * 1000);
+            function login() {
+                window.location.replace("/");
+            }
+            function update() {
+                let xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState == 4) {
+    	                  let result = this.responseText.split('\n');
+    	                  let chats = result[0].split(' || ');
+    	                  let users = result[1].split(' || ');
+    	                  let colors = result[2].split(' || ');
+    	                  let times = result[3].split(' || ');
+    	                  for (var i=0; i <20; i++) {
+    	                      if (users[i] == '') {document.getElementById(i.toString()).innerHTML = '<br>';}
+    	                      else {
+    	                          if (users[i] == 'admin') {
+    	                              if (chats[i] == 'clear') {
+    	                                  document.getElementById(i.toString()).innerHTML = '<p style="color: grey; text-align: center">--- 管理员清除了日志 ---</p>';
+    	                              }
+    	                          }
+    	                          else {
+    	                              if (chats[i].slice(0, 8) == '::file::') {
+    	                                  var a1 = '<p style="color: white; text-align: left; line-height: 4px">[' + times[i] + '] <span style="color: ' + colors[i] + ';"><</span><span style="color: ' + colors[i] + ';"> ' + users[i] + ' </span><span style="color: ' + colors[i] + ';">>: </span><span style="color: white;"><a download style="background-color: white; color: black;" href="./static/uploads/';
+    	                                  var s = a1 + chats[i].substr(8, chats[i].split('').length) + '">我上传了：' + chats[i].substr(8, chats[i].split('').length) + '</a></span></p>';
+    	                                  document.getElementById(i.toString()).innerHTML = s;
+    	                              }
+    	                              else {
+    	                                  document.getElementById(i.toString()).innerHTML = '<p style="color: white; text-align: left; line-height: 4px">[' + times[i] + '] <span style="color: ' + colors[i] + ';"><</span><span style="color: ' + colors[i] + ';"> ' + users[i] + ' </span><span style="color: ' + colors[i] + ';">>: </span><span style="color: white; font-family: 黑体; text-shadow: 0 0 20px white;">' + chats[i] + '</span></p>';
+    	                              }
+    	                          }
+    	                      }
+    	                  }
+                    }
+                };
+                xhr.open("post", "chats", true)
+                xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                xhr.send(
+                    "username=" + "{{ username }}" +
+                    "&update=" + "{{ update }}"
+                );
+            }
+            update();
+        </script>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>syh's chatter</title>
+    <link rel="shortcut icon" href="static/icon.png" type="image/x-icon">
+    <style>
+        #login {
+            margin-left: auto;
+            margin-right: auto;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+        #body {
+            background-color: rgba(15, 15, 15, 1);
+            width: 2040px;
+            height: 1440px;
+            align-items: center;
+            padding-top: 200px;
+        }
+        
+        #login-window {
+            width: 1460px;
+            height: 720px;
+            line-height: 720px;
+            margin: auto;
+            display: flex;
+            position: relative;
+            padding-top: 20px;
+            padding-bottom: 20px;
+            padding-left: 50px;
+            padding-right: 50px;
+            border-top: 1px solid white;
+            border-bottom: 1px solid white;
+            border-color: white;
+        }
+    </style>
+</head>
+
+<body id="body">
+    <p style="width: 1560px; color: white; text-shadow: 0 0 20px white; font-weight: bold; font-size: 10px; text-align: left; margin: auto; font-family: 黑体;">chatter boot complater</p>
+    <div id="login-window">
+        <h1 style="color: white; text-shadow: 0 0 20px white; font-weight: normal; font-size: 75px; text-align: left; position: absolute; top: -45%; font-family: 黑体;">CHAT ROOM LOGGER</h1>
+        
+        <div style="width: 1460px; border-bottom: 2px solid white; position: absolute; top: 135px;"></div>
+        <p style="width: 1460px; color: white; text-shadow: 0 0 20px white; font-weight: bold; font-size: 10px; text-align: left; margin: auto; position: absolute; top: -215px; font-family: 黑体;">chatter</p>
+        
+        <p style="background-color: white; color: white; height: 575px; width: 15px; position: absolute; top: 145px; left: 15%; box-shadow: 0 0 10px white;"></p>
+        
+        <script>
+            var color='white';
+            if (window.location.pathname == '/error') {
+              color = 'red';
+            }
+            for (var i=0; i < 24; i++) {
+                var p = '<p style="background-color: ' + color + '; color: ' + color + '; height: 225px; width: 10px; font-weight: bold; position: absolute; bottom: 140px; left: ' + (22 + i * 3).toString() + '%; box-shadow: 0 0 10px ' + color + ';" id="line' + (i + 1).toString() + '"></p>';
+                document.write(p);
+            }
+        </script>
+        
+        <form action="/chat" method="POST" style="position: absolute; left: 20%; padding: 0px; line-height: 100%; top: 180px;">
+            <label style="font-family: 黑体; color: white; width: 150px; height: 50px; font-size: 40px; text-shadow: 0 0 20px white;">username: </label>
+            <input type="text" name="username" style="font-family: 黑体; background-color: rgba(15, 15, 15, 0); color: white; width: 900px; height: 50px; border-top: 0px; border-left: 0px; border-right: 0px; border-bottom: 2px solid white; border-color: white; font-size: 30px; text-shadow: 0 0 20px white;">
+            <br>
+            <br>
+            <br>
+            <label style="font-family: 黑体; color: white; width: 150px; height: 50px; font-size: 40px; text-shadow: 0 0 20px white;">password: </label>
+            <input type="password" name="password" style="font-family: 黑体; background-color: rgba(15, 15, 15, 0); color: white; width: 900px; height: 50px; border-top: 0px; border-left: 0px; border-right: 0px; border-bottom: 2px solid white; border-color: white; font-size: 30px; text-shadow: 0 0 20px white;">
+            <script>
+              for (var i = 0; i < 21; i++) {
+                document.write('<br>')
+              }
+            </script>
+            <div style="text-align: center;">
+                <input type="submit" value="LOGIN" style="font-family: 黑体; border-top: 0px; border-bottom: 0px; border-left: 5px solid white; border-right: 5px solid white; background-color: rgba(15, 15, 15, 1); width: 300px; height: 100px; color: white; font-size: 40px;  text-shadow: 0 0 20px white;">
+            </div>
+        </form>
+        
+      <p id="zhezhao" style="background-color: rgba(15, 15, 15, 1); color: rgba(15, 15, 15, 1); height: 820px; width: 1560px; position: absolute; top: 0px; left: 0%"></p>
+      
+      <script>
+          var i=100;
+          if (window.location.pathname == '/error') {
+              document.getElementById('zhezhao').style = '';
+          }
+          else {
+              setInterval(start, 0.5 * 1000);
+          }
+          function start() {
+              setInterval(update, 10);
+          }
+          function update() {
+              document.getElementById('zhezhao').style = 'background-color: rgba(15, 15, 15, ' + (i / 100).toString() + '); color: rgba(15, 15, 15, 1); height: 820px; width: 1560px; position: absolute; top: 0px; left: 0%';
+              i--;
+              if (i <= 0) {
+                  document.getElementById('zhezhao').style = '';
+              }
+          }
+      </script>
+    </div>
+</body>
+
+</html>
