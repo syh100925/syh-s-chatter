@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>syh's chatter · 错误</title>
+    <link rel="shortcut icon" href="static/icon.png" type="image/x-icon">
+    <style>
+        /* ========== 扁平主题变量 ========== */
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #242424;
+            --fg-primary: #e0e0e0;
+            --fg-secondary: #999999;
+            --fg-muted: #666666;
+            --border-color: #3a3a3a;
+            --border-focus: #e0e0e0;
+            --accent: #ffffff;
+            --accent-hover-text: #1a1a1a;
+            --error-color: #ff6b6b;
+            --error-glow-1: #ff6b6b;
+            --error-glow-2: #ff4444;
+            --font-mono: 'Jetbrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+            --transition-speed: 0.2s;
+        }
+
+        body.light-theme {
+            --bg-primary: #fafafa;
+            --bg-secondary: #f0f0f0;
+            --fg-primary: #1a1a1a;
+            --fg-secondary: #555555;
+            --fg-muted: #999999;
+            --border-color: #cccccc;
+            --border-focus: #1a1a1a;
+            --accent: #1a1a1a;
+            --accent-hover-text: #ffffff;
+            --error-color: #d32f2f;
+            --error-glow-1: #d32f2f;
+            --error-glow-2: #b71c1c;
+        }
+
+        @font-face {
+            font-family: 'Jetbrains Mono';
+            src: url('static/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            font-family: var(--font-mono);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--fg-primary);
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ========== 主题切换按钮 ========== */
+        .theme-toggle {
+            position: fixed;
+            top: 24px;
+            right: 28px;
+            z-index: 100;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--fg-secondary);
+            padding: 10px 18px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            letter-spacing: 2px;
+            transition: all var(--transition-speed);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .theme-toggle:hover {
+            color: var(--fg-primary);
+            border-color: var(--fg-primary);
+        }
+        .theme-toggle .mode-text {
+            display: inline-block;
+            min-width: 2.5em;
+            text-align: center;
+            animation: textPulse 2s infinite;
+        }
+        @keyframes textPulse {
+            0%,
+            100% {
+                opacity: 0.7;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* ========== 主容器 ========== */
+        .error-container {
+            width: 100%;
+            max-width: 420px;
+            padding: 0 2rem;
+            text-align: center;
+        }
+
+        /* ========== 品牌标识 ========== */
+        .brand {
+            font-size: 0.75rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            margin-bottom: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            height: 20px;
+        }
+        .brand .dash {
+            display: inline-block;
+            width: 20px;
+            height: 1px;
+            background: var(--border-color);
+            transition: background var(--transition-speed);
+        }
+        /* 错误标识动态文字 */
+        .dynamic-word {
+            display: inline-block;
+            position: relative;
+            min-width: 90px;
+            text-align: center;
+            font-weight: 500;
+            letter-spacing: 4px;
+            color: var(--error-glow-1);
+        }
+        .dynamic-word span {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            white-space: nowrap;
+            animation: errorWordCycle 3s infinite;
+            opacity: 0;
+        }
+        .dynamic-word span:nth-child(1) {
+            animation-delay: 0s;
+        }
+        .dynamic-word span:nth-child(2) {
+            animation-delay: 1.5s;
+        }
+        @keyframes errorWordCycle {
+            0%,
+            30% {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+            35%,
+            65% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            70%,
+            100% {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+        }
+
+        /* ========== 标题区 ========== */
+        .error-title {
+            margin-bottom: 2rem;
+        }
+        .error-title h1 {
+            font-size: 2.4rem;
+            letter-spacing: 6px;
+            font-weight: 400;
+            color: var(--fg-primary);
+            margin-bottom: 0.6rem;
+            text-transform: uppercase;
+        }
+        .error-title .divider {
+            display: block;
+            width: 40px;
+            height: 2px;
+            background: var(--border-color);
+            margin: 0 auto 1rem;
+            transition: background var(--transition-speed);
+        }
+
+        /* ========== 错误大字动画 ========== */
+        .error-animation-text {
+            font-size: 3.5rem;
+            font-weight: 500;
+            letter-spacing: 8px;
+            margin: 1.5rem 0;
+            color: var(--error-glow-1);
+            text-transform: uppercase;
+            animation: errorTextFlicker 2.5s infinite;
+            line-height: 1.2;
+        }
+        @keyframes errorTextFlicker {
+            0%,
+            19%,
+            21%,
+            23%,
+            25%,
+            54%,
+            56%,
+            100% {
+                opacity: 1;
+                color: var(--error-glow-1);
+            }
+            20%,
+            24%,
+            55% {
+                opacity: 0.4;
+                color: var(--error-glow-2);
+            }
+        }
+
+        /* ========== 错误信息 ========== */
+        .error-message {
+            color: var(--fg-secondary);
+            font-size: 1rem;
+            margin: 1.5rem 0 2rem;
+            line-height: 1.6;
+            letter-spacing: 1px;
+        }
+        .error-message .highlight {
+            color: var(--error-color);
+            font-weight: 500;
+            letter-spacing: 2px;
+            /* 简单呼吸效果 */
+            animation: highlightPulse 2s infinite;
+        }
+        @keyframes highlightPulse {
+            0%,
+            100% {
+                opacity: 0.85;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* ========== 按钮 ========== */
+        .back-button {
+            display: inline-block;
+            width: 100%;
+            background: transparent;
+            border: 2px solid var(--border-color);
+            color: var(--fg-primary);
+            padding: 14px 24px;
+            font-size: 0.9rem;
+            font-family: var(--font-mono);
+            letter-spacing: 4px;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            text-decoration: none;
+            text-transform: uppercase;
+            border-radius: 0;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            text-align: center;
+        }
+        .back-button:hover {
+            background: var(--accent);
+            color: var(--accent-hover-text);
+            border-color: var(--accent);
+        }
+        .back-button:active {
+            transform: scale(0.98);
+            transition: transform 0.08s;
+        }
+
+        /* ========== 提示信息 ========== */
+        .hint {
+            margin-top: 2rem;
+            font-size: 0.7rem;
+            color: var(--fg-muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .hint a {
+            color: var(--fg-primary);
+            text-decoration: none;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 2px;
+            transition: border-color var(--transition-speed);
+        }
+        .hint a:hover {
+            border-bottom-color: var(--error-color);
+            color: var(--error-color);
+        }
+
+        /* ========== 响应式 ========== */
+        @media (max-width: 480px) {
+            .error-container {
+                padding: 0 1.5rem;
+                max-width: 100%;
+            }
+            .error-title h1 {
+                font-size: 1.8rem;
+                letter-spacing: 4px;
+            }
+            .error-animation-text {
+                font-size: 2.5rem;
+                letter-spacing: 4px;
+            }
+            .back-button {
+                letter-spacing: 2px;
+                font-size: 0.8rem;
+            }
+            .dynamic-word {
+                min-width: 70px;
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 主题切换按钮 -->
+    <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+        <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
+    </button>
+
+    <script>
+        const themeToggle = document.getElementById('themeToggle');
+        const modeIndicator = document.getElementById('modeIndicator');
+
+        function setThemeUI(isLight) {
+            if (isLight) {
+                document.body.classList.add('light-theme');
+                modeIndicator.textContent = '亮';
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.body.classList.remove('light-theme');
+                modeIndicator.textContent = '暗';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') {
+            setThemeUI(true);
+        } else {
+            setThemeUI(false);
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const isLight = !document.body.classList.contains('light-theme');
+            setThemeUI(isLight);
+        });
+    </script>
+
+    <!-- 密码错误区域 - 扁平布局，动态文字动画 -->
+    <div class="error-container">
+        <!-- 品牌标识 - 动态文字 -->
+        <div class="brand">
+            <span class="dash"></span>
+            <span class="dynamic-word">
+                <span>DENIED</span>
+                <span>BLOCKED</span>
+            </span>
+            <span class="dash"></span>
+        </div>
+
+        <!-- 标题 -->
+        <div class="error-title">
+            <h1>SYH-CR</h1>
+            <span class="divider"></span>
+        </div>
+
+        <!-- 错误动画文字（替代原来的锁图标） -->
+        <div class="error-animation-text">LOCKED</div>
+
+        <!-- 错误信息 -->
+        <div class="error-message">
+            <span class="highlight">密码错误</span>，请重新登录。
+        </div>
+
+        <!-- 返回按钮 -->
+        <a href="/sec" class="back-button">← 返回登录</a>
+
+        <!-- 底部提示 -->
+        <div class="hint">
+            如果您忘记了密码，请联系管理员。
+        </div>
+    </div>
+</body>
+</html>

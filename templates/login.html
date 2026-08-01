@@ -1,103 +1,407 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>syh's chatter</title>
     <link rel="shortcut icon" href="static/icon.png" type="image/x-icon">
     <style>
-        #login {
-            margin-left: auto;
-            margin-right: auto;
-            text-align: center;
-            background-color: rgba(0, 0, 0, 0.9);
+        /* ========== 扁平主题变量 ========== */
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #242424;
+            --fg-primary: #e0e0e0;
+            --fg-secondary: #999999;
+            --fg-muted: #666666;
+            --border-color: #3a3a3a;
+            --border-focus: #e0e0e0;
+            --accent: #ffffff;
+            --accent-hover-text: #1a1a1a;
+            --font-mono: 'Jetbrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+            --transition-speed: 0.2s;
+            --glow-text-1: #ffffff;
+            --glow-text-2: #999999;
         }
-        #body {
-            background-color: rgba(15, 15, 15, 1);
-            width: 2040px;
-            height: 1440px;
-            align-items: center;
-            padding-top: 200px;
+
+        body.light-theme {
+            --bg-primary: #fafafa;
+            --bg-secondary: #f0f0f0;
+            --fg-primary: #1a1a1a;
+            --fg-secondary: #555555;
+            --fg-muted: #999999;
+            --border-color: #cccccc;
+            --border-focus: #1a1a1a;
+            --accent: #1a1a1a;
+            --accent-hover-text: #ffffff;
+            --glow-text-1: #1a1a1a;
+            --glow-text-2: #666666;
         }
-        
-        #login-window {
-            width: 1460px;
-            height: 720px;
-            line-height: 720px;
-            margin: auto;
+
+        @font-face {
+            font-family: 'Jetbrains Mono';
+            src: url('static/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            font-family: var(--font-mono);
+            min-height: 100vh;
             display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--fg-primary);
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ========== 主题切换按钮 - 纯文字版 ========== */
+        .theme-toggle {
+            position: fixed;
+            top: 24px;
+            right: 28px;
+            z-index: 100;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--fg-secondary);
+            padding: 10px 18px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            letter-spacing: 2px;
+            transition: all var(--transition-speed);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .theme-toggle:hover {
+            color: var(--fg-primary);
+            border-color: var(--fg-primary);
+        }
+        .theme-toggle .mode-text {
+            display: inline-block;
+            min-width: 2.5em;
+            text-align: center;
+            transition: color 0.3s;
+            animation: textPulse 2s infinite;
+        }
+        @keyframes textPulse {
+            0%,
+            100% {
+                opacity: 0.7;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* ========== 主容器 ========== */
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            padding: 0 2rem;
+            text-align: center;
+        }
+
+        /* ========== 品牌标识 - 动态文字 ========== */
+        .brand {
+            font-size: 0.75rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            margin-bottom: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            height: 20px;
+        }
+        .brand .dash {
+            display: inline-block;
+            width: 20px;
+            height: 1px;
+            background: var(--border-color);
+            transition: background var(--transition-speed);
+        }
+        .dynamic-word {
+            display: inline-block;
             position: relative;
-            padding-top: 20px;
-            padding-bottom: 20px;
-            padding-left: 50px;
-            padding-right: 50px;
-            border-top: 1px solid white;
-            border-bottom: 1px solid white;
-            border-color: white;
+            min-width: 80px;
+            text-align: center;
+            font-weight: 500;
+            letter-spacing: 4px;
+            color: var(--glow-text-1);
+        }
+        .dynamic-word span {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            white-space: nowrap;
+            animation: wordCycle 4s infinite;
+            opacity: 0;
+        }
+        .dynamic-word span:nth-child(1) {
+            animation-delay: 0s;
+        }
+        .dynamic-word span:nth-child(2) {
+            animation-delay: 2s;
+        }
+        @keyframes wordCycle {
+            0%,
+            35% {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+            40%,
+            60% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            65%,
+            100% {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+        }
+
+        /* ========== 标题区 ========== */
+        .login-title {
+            margin-bottom: 3rem;
+        }
+        .login-title h1 {
+            font-size: 2.4rem;
+            letter-spacing: 6px;
+            font-weight: 400;
+            color: var(--fg-primary);
+            margin-bottom: 0.6rem;
+            text-transform: uppercase;
+        }
+        .login-title .divider {
+            display: block;
+            width: 40px;
+            height: 2px;
+            background: var(--border-color);
+            margin: 0 auto 1rem;
+            transition: background var(--transition-speed);
+        }
+        .login-title p {
+            color: var(--fg-muted);
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* ========== 表单控件 ========== */
+        .form-control {
+            position: relative;
+            margin: 2rem 0;
+            text-align: left;
+        }
+        .form-control input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--border-color);
+            padding: 14px 4px 10px;
+            font-size: 1rem;
+            color: var(--fg-primary);
+            font-family: var(--font-mono);
+            letter-spacing: 1px;
+            outline: none;
+            transition: border-color var(--transition-speed);
+            border-radius: 0;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+        .form-control input:focus {
+            border-bottom-color: var(--border-focus);
+        }
+        .form-control input::placeholder {
+            color: transparent;
+        }
+        .form-control label {
+            position: absolute;
+            left: 4px;
+            top: 14px;
+            color: var(--fg-muted);
+            pointer-events: none;
+            transition: all var(--transition-speed);
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .form-control input:focus~label,
+        .form-control input:not(:placeholder-shown)~label {
+            transform: translateY(-26px);
+            font-size: 0.7rem;
+            letter-spacing: 3px;
+            color: var(--fg-secondary);
+        }
+
+        /* ========== 提交按钮 ========== */
+        button[type="submit"] {
+            width: 100%;
+            background: transparent;
+            border: 2px solid var(--border-color);
+            color: var(--fg-primary);
+            padding: 14px 24px;
+            font-size: 0.9rem;
+            font-family: var(--font-mono);
+            letter-spacing: 4px;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            margin-top: 2.5rem;
+            text-transform: uppercase;
+            border-radius: 0;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+        button[type="submit"]:hover {
+            background: var(--accent);
+            color: var(--accent-hover-text);
+            border-color: var(--accent);
+        }
+        button[type="submit"]:active {
+            transform: scale(0.98);
+            transition: transform 0.08s;
+        }
+
+        /* ========== 底部信息 ========== */
+        .footer-note {
+            margin-top: 2.5rem;
+            font-size: 0.7rem;
+            color: var(--fg-muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .footer-note .dot-sep {
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            background: var(--border-color);
+            margin: 0 8px;
+            vertical-align: middle;
+            transition: background var(--transition-speed);
+        }
+
+        /* ========== 响应式 ========== */
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 0 1.5rem;
+                max-width: 100%;
+            }
+            .login-title h1 {
+                font-size: 1.8rem;
+                letter-spacing: 4px;
+            }
+            button[type="submit"] {
+                letter-spacing: 2px;
+                font-size: 0.8rem;
+            }
+            .dynamic-word {
+                min-width: 60px;
+                font-size: 0.7rem;
+            }
         }
     </style>
 </head>
+<body>
+    <!-- 主题切换按钮（纯文字） -->
+    <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+        <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
+    </button>
 
-<body id="body">
-    <p style="width: 1560px; color: white; text-shadow: 0 0 20px white; font-weight: bold; font-size: 10px; text-align: left; margin: auto; font-family: 黑体;">chatter boot complater</p>
-    <div id="login-window">
-        <h1 style="color: white; text-shadow: 0 0 20px white; font-weight: normal; font-size: 75px; text-align: left; position: absolute; top: -45%; font-family: 黑体;">CHAT ROOM LOGGER</h1>
-        
-        <div style="width: 1460px; border-bottom: 2px solid white; position: absolute; top: 135px;"></div>
-        <p style="width: 1460px; color: white; text-shadow: 0 0 20px white; font-weight: bold; font-size: 10px; text-align: left; margin: auto; position: absolute; top: -215px; font-family: 黑体;">chatter</p>
-        
-        <p style="background-color: white; color: white; height: 575px; width: 15px; position: absolute; top: 145px; left: 15%; box-shadow: 0 0 10px white;"></p>
-        
-        <script>
-            var color='white';
-            if (window.location.pathname == '/error') {
-              color = 'red';
+    <script>
+        const themeToggle = document.getElementById('themeToggle');
+        const modeIndicator = document.getElementById('modeIndicator');
+
+        function setThemeUI(isLight) {
+            if (isLight) {
+                document.body.classList.add('light-theme');
+                modeIndicator.textContent = '亮';
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.body.classList.remove('light-theme');
+                modeIndicator.textContent = '暗';
+                localStorage.setItem('theme', 'dark');
             }
-            for (var i=0; i < 24; i++) {
-                var p = '<p style="background-color: ' + color + '; color: ' + color + '; height: 225px; width: 10px; font-weight: bold; position: absolute; bottom: 140px; left: ' + (22 + i * 3).toString() + '%; box-shadow: 0 0 10px ' + color + ';" id="line' + (i + 1).toString() + '"></p>';
-                document.write(p);
-            }
-        </script>
-        
-        <form action="/chat" method="POST" style="position: absolute; left: 20%; padding: 0px; line-height: 100%; top: 180px;">
-            <label style="font-family: 黑体; color: white; width: 150px; height: 50px; font-size: 40px; text-shadow: 0 0 20px white;">username: </label>
-            <input type="text" name="username" style="font-family: 黑体; background-color: rgba(15, 15, 15, 0); color: white; width: 900px; height: 50px; border-top: 0px; border-left: 0px; border-right: 0px; border-bottom: 2px solid white; border-color: white; font-size: 30px; text-shadow: 0 0 20px white;">
-            <br>
-            <br>
-            <br>
-            <label style="font-family: 黑体; color: white; width: 150px; height: 50px; font-size: 40px; text-shadow: 0 0 20px white;">password: </label>
-            <input type="password" name="password" style="font-family: 黑体; background-color: rgba(15, 15, 15, 0); color: white; width: 900px; height: 50px; border-top: 0px; border-left: 0px; border-right: 0px; border-bottom: 2px solid white; border-color: white; font-size: 30px; text-shadow: 0 0 20px white;">
-            <script>
-              for (var i = 0; i < 21; i++) {
-                document.write('<br>')
-              }
-            </script>
-            <div style="text-align: center;">
-                <input type="submit" value="LOGIN" style="font-family: 黑体; border-top: 0px; border-bottom: 0px; border-left: 5px solid white; border-right: 5px solid white; background-color: rgba(15, 15, 15, 1); width: 300px; height: 100px; color: white; font-size: 40px;  text-shadow: 0 0 20px white;">
+        }
+
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') {
+            setThemeUI(true);
+        } else {
+            setThemeUI(false);
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const isLight = !document.body.classList.contains('light-theme');
+            setThemeUI(isLight);
+        });
+    </script>
+
+    <!-- 登录区域 - 扁平布局，动态文字动画 -->
+    <div class="login-container">
+        <!-- 品牌标识 - 动态文字替换了原来的图标 -->
+        <div class="brand">
+            <span class="dash"></span>
+            <span class="dynamic-word">
+                <span>SECURE</span>
+                <span>ENCRYPT</span>
+            </span>
+            <span class="dash"></span>
+        </div>
+
+        <!-- 标题 -->
+        <div class="login-title">
+            <h1>SYH-CR</h1>
+            <span class="divider"></span>
+            <p>syh's chatter · 登录</p>
+        </div>
+
+        <!-- 表单 -->
+        <form action="/chatts" method="POST" autocomplete="off">
+            <div class="form-control">
+                <input type="text" required name="username" id="username" placeholder=" " autocomplete="off">
+                <label for="username">Username</label>
             </div>
+            <div class="form-control">
+                <input type="password" required name="password" id="password" placeholder=" " autocomplete="off">
+                <label for="password">Password</label>
+            </div>
+            <button type="submit">// 进入 //</button>
         </form>
-        
-      <p id="zhezhao" style="background-color: rgba(15, 15, 15, 1); color: rgba(15, 15, 15, 1); height: 820px; width: 1560px; position: absolute; top: 0px; left: 0%"></p>
-      
-      <script>
-          var i=100;
-          if (window.location.pathname == '/error') {
-              document.getElementById('zhezhao').style = '';
-          }
-          else {
-              setInterval(start, 0.5 * 1000);
-          }
-          function start() {
-              setInterval(update, 10);
-          }
-          function update() {
-              document.getElementById('zhezhao').style = 'background-color: rgba(15, 15, 15, ' + (i / 100).toString() + '); color: rgba(15, 15, 15, 1); height: 820px; width: 1560px; position: absolute; top: 0px; left: 0%';
-              i--;
-              if (i <= 0) {
-                  document.getElementById('zhezhao').style = '';
-              }
-          }
-      </script>
+
+        <!-- 底部装饰 -->
+        <div class="footer-note">
+            <span>end-to-end</span>
+            <span class="dot-sep"></span>
+            <span>encrypted</span>
+
+            <div style="margin-top: 1.5rem; font-size: 0.8rem; letter-spacing: 1px;">
+                <a href="/register" style="color: var(--fg-muted); text-decoration: none; border-bottom: 1px solid var(--border-color); padding-bottom: 2px; transition: color 0.2s;">
+                    没有账号？立即注册
+                </a>
+            </div>
+
+            {% if registered %}
+                <br>
+                <div style="color: var(--fg-secondary); margin-bottom: 1rem;">注册成功，请登录</div>
+            {% endif %}
+        </div>
     </div>
 </body>
-
 </html>
