@@ -53,6 +53,8 @@
             /* 分享预览专用 */
             --preview-bg: #1a1a1a;
             --preview-text: #e0e0e0;
+            --upload-icon-filter: invert(1);
+            --upload-icon-hover-filter: invert(0);
         }
         body.light-theme {
             --bg-primary: #fafafa;
@@ -86,6 +88,8 @@
             --scrollbar-thumb-hover: #aaaaaa;
             --preview-bg: #fafafa;
             --preview-text: #1a1a1a;
+            --upload-icon-filter: none;
+            --upload-icon-hover-filter: invert(1);
         }
         @font-face {
             font-family: 'Jetbrains Mono';
@@ -312,6 +316,85 @@
             line-height: 1.5;
             font-size: var(--message-font-size);
             border-radius: var(--bubble-radius);
+        }
+        .message-row {
+            position: relative;
+        }
+        .message-bubble.recalled-bubble {
+            color: var(--fg-muted);
+            font-style: italic;
+            border-style: dashed;
+        }
+        .message-time {
+            color: var(--fg-muted);
+            font-size: 0.68rem;
+            margin-top: 4px;
+            padding: 0 4px;
+        }
+        .own-message .message-time {
+            text-align: right;
+        }
+        .reply-reference {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--fg-muted);
+            background: var(--bg-secondary);
+            border-left: 2px solid var(--border-color);
+            padding: 3px 7px;
+            margin-top: 6px;
+            text-align: left;
+            font: inherit;
+            font-size: 0.72rem;
+            cursor: pointer;
+        }
+        .reply-reference:hover {
+            color: var(--fg-primary);
+            border-left-color: var(--fg-primary);
+        }
+        .message-highlight {
+            animation: messageHighlight 1.8s ease;
+        }
+        @keyframes messageHighlight {
+            0%, 100% { outline: 1px solid transparent; }
+            20%, 70% { outline: 1px solid var(--fg-primary); outline-offset: 4px; }
+        }
+        .message-bubble .remote-image-link {
+            display: block;
+            max-width: 320px;
+        }
+        .message-bubble .remote-image-link img {
+            display: block;
+            max-width: 320px;
+            max-height: 320px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border: 1px solid var(--bubble-border);
+        }
+        .rich-link {
+            color: var(--link-color);
+            text-decoration: none;
+            overflow-wrap: anywhere;
+        }
+        .rich-link:hover {
+            text-decoration: underline;
+        }
+        .system-row {
+            display: block !important;
+            margin: 8px 0 16px !important;
+        }
+        .system-row .system-message-item {
+            color: var(--system-text);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 16px;
+            border-left: 3px solid var(--system-border);
+            font-size: 0.84rem;
+            line-height: 1.5;
+            word-break: break-word;
         }
         .own-message .message-bubble {
             background-color: var(--own-bg);
@@ -610,6 +693,163 @@
             color: var(--error-color);
             padding-left: 8px;
             display: none;
+        }
+        .mute-status {
+            display: none;
+            margin: 0 0 12px;
+            padding: 8px 12px;
+            border: 1px solid var(--error-color);
+            color: var(--error-color);
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+        .mute-status.active {
+            display: block;
+        }
+        .reply-compose {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            margin: 0 0 8px;
+            padding: 7px 10px;
+            border: 1px solid var(--border-color);
+            color: var(--fg-secondary);
+            font-size: 0.76rem;
+            min-width: 0;
+        }
+        .reply-compose.active {
+            display: flex;
+        }
+        .reply-compose .reply-compose-text {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            flex: 1;
+            min-width: 0;
+        }
+        .reply-compose button,
+        .message-menu button,
+        .avatar-menu button,
+        .action-dialog button {
+            font: inherit;
+        }
+        .reply-compose button {
+            background: transparent;
+            border: 0;
+            color: var(--fg-muted);
+            cursor: pointer;
+            padding: 2px 5px;
+        }
+        .reply-compose button:hover {
+            color: var(--fg-primary);
+        }
+        .file-picker-button {
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--fg-primary);
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            flex-shrink: 0;
+        }
+        .file-picker-button:hover {
+            background: var(--fg-primary);
+            border-color: var(--fg-primary);
+        }
+        .file-picker-button img {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            filter: var(--upload-icon-filter, none);
+        }
+        .file-picker-button:hover img {
+            filter: var(--upload-icon-hover-filter, invert(1));
+        }
+        .message-menu,
+        .avatar-menu {
+            position: fixed;
+            z-index: 10000;
+            display: none;
+            min-width: 150px;
+            max-width: min(220px, calc(100vw - 16px));
+            background: var(--window-bg);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            padding: 4px;
+        }
+        .message-menu.active,
+        .avatar-menu.active {
+            display: block;
+        }
+        .message-menu button,
+        .avatar-menu button {
+            width: 100%;
+            display: block;
+            text-align: left;
+            border: 0;
+            background: transparent;
+            color: var(--fg-primary);
+            padding: 9px 11px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .message-menu button:hover,
+        .avatar-menu button:hover {
+            background: var(--fg-primary);
+            color: var(--bg-primary);
+        }
+        .action-dialog {
+            position: fixed;
+            inset: 0;
+            z-index: 11000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.68);
+            padding: 20px;
+        }
+        .action-dialog.active {
+            display: flex;
+        }
+        .action-dialog-card {
+            width: min(380px, 100%);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            padding: 22px;
+        }
+        .action-dialog-card h3 {
+            color: var(--fg-primary);
+            font-size: 1rem;
+            font-weight: 400;
+            margin-bottom: 10px;
+        }
+        .action-dialog-card p {
+            color: var(--fg-secondary);
+            font-size: 0.83rem;
+            line-height: 1.6;
+            margin-bottom: 18px;
+            overflow-wrap: anywhere;
+        }
+        .action-dialog-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .action-dialog button {
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--fg-primary);
+            padding: 7px 14px;
+            cursor: pointer;
+        }
+        .action-dialog button:hover,
+        .action-dialog button.primary {
+            background: var(--fg-primary);
+            color: var(--bg-primary);
         }
         .clear-message {
             text-align: center;
@@ -1466,6 +1706,15 @@
                 font-size: 0.7rem;
                 padding: 4px 10px;
             }
+            .message-content {
+                max-width: 82%;
+            }
+            .input-row {
+                gap: 7px;
+            }
+            .file-field {
+                flex: 0 0 auto;
+            }
         }
     </style>
 </head>
@@ -1512,6 +1761,27 @@
         </div>
     </div>
 
+    <div class="action-dialog" id="actionDialog" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="action-dialog-card">
+            <h3 id="actionDialogTitle">确认操作</h3>
+            <p id="actionDialogMessage"></p>
+            <div class="action-dialog-actions">
+                <button type="button" id="actionDialogCancel">取消</button>
+                <button type="button" class="primary" id="actionDialogConfirm">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="message-menu" id="messageMenu" role="menu">
+        <button type="button" data-action="reply">↩ 回复</button>
+        <button type="button" data-action="copy">⧉ 复制</button>
+        <button type="button" data-action="recall">⌫ 撤回</button>
+    </div>
+    <div class="avatar-menu" id="avatarMenu" role="menu">
+        <button type="button" data-action="mute">⊘ 禁言</button>
+        <button type="button" data-action="unmute">⊙ 解除禁言</button>
+    </div>
+
     <!-- ========== 主聊天区域 ========== -->
     <p style="color: var(--fg-muted); align-self: flex-start; margin-left: 15px; margin-bottom: 8px; font-size:0.8rem; letter-spacing:2px;">✦ chatter boot complete ✦</p>
 
@@ -1541,19 +1811,30 @@
         </div>
 
         <!-- 管理员面板 -->
-        {% if username == 'admin' %}
+        {% if is_admin %}
         <div class="admin-panel"><p>快捷命令</p><div class="command-buttons"><button class="cmd-btn" data-cmd="clear">clear</button><button class="cmd-btn" data-cmd="change_color [用户名] [颜色]">change_color</button><button class="cmd-btn" data-cmd="delete [数量]">delete</button><button class="cmd-btn" data-cmd="change_color 梨岚 #ff0000">梨岚红色</button><button class="cmd-btn" data-cmd="change_color 梨岚 #00ff00">梨岚绿色</button><button class="cmd-btn" data-cmd="delete 1">delete 1</button><button class="cmd-btn" data-cmd="delete 5">delete 5</button><button class="cmd-btn" data-cmd="unknown">未知命令</button></div></div>
         {% endif %}
 
         <!-- 输入区域 -->
         <div id="chat-combined">
+            <div class="mute-status" id="muteStatus" aria-live="polite"></div>
+            <div class="reply-compose" id="replyCompose">
+                <span>↩</span>
+                <span class="reply-compose-text" id="replyComposeText"></span>
+                <button type="button" id="cancelReplyBtn" aria-label="取消回复">×</button>
+            </div>
             <div class="input-row">
                 <div class="text-field">
                     <input type="text" name="upload_value" id="upft" placeholder="输入文字...">
                     <div class="warning-hint" id="warningHint" style="display:none;"></div>
                     <div class="autocomplete-menu"></div>
                 </div>
-                <div class="file-field"><input type="file" name="file" id="file-input"></div>
+                <div class="file-field">
+                    <button type="button" class="file-picker-button" id="filePickerBtn" title="选择文件" aria-label="选择文件">
+                        <img src="/static/upload.png" alt="">
+                    </button>
+                    <input type="file" name="file" id="file-input" hidden>
+                </div>
                 <div class="send-btn">
                     <button type="button" id="sendBtn">发送</button>
                     <button type="button" class="text-file-send-btn" id="textFileSendBtn" title="发送文本文件">☐</button>
@@ -1951,6 +2232,15 @@
 
             function isImageFile(fn) { return IMAGE_EXTS.includes((fn || '').split('.').pop().toLowerCase()); }
 
+            function fileDownload(url, filename) {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            }
+
             function openFileWindow(url, filename) {
                 if (openWindows[url]) {
                     const ex = openWindows[url];
@@ -1966,13 +2256,33 @@
                         `<img src="${url}" style="max-width:100%; max-height:55vh; display:block; margin:0 auto;" onerror="this.parentElement.innerHTML='<p style=\\'color:var(--fg-muted);\\'>图片加载失败，文件可能已失效。</p>'">`;
                     const dw = w.querySelector('.download-window-btn');
                     dw.style.display = 'inline-block';
-                    dw.onclick = () => { const a = document.createElement('a');
-                        a.href = url;
-                        a.download = filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a); };
+                    dw.onclick = () => fileDownload(url, filename);
                     openWindows[url] = w;
+                    return;
+                }
+                const extension = (filename || '').split('.').pop().toLowerCase();
+                if (extension === 'cpp') {
+                    const w = createDraggableWindow(filename, '<p style="color:var(--fg-muted);">读取中...</p>', false, url);
+                    const cd = w.querySelector('.window-content');
+                    const cb = w.querySelector('.copy-content-btn');
+                    const dw = w.querySelector('.download-window-btn');
+                    dw.style.display = 'inline-block';
+                    dw.onclick = () => fileDownload(url, filename);
+                    openWindows[url] = w;
+                    fetch('/api/cpp-preview?filename=' + encodeURIComponent(filename) + '&update=' + encodeURIComponent(upd))
+                        .then(response => response.ok ? response.json() : response.json().then(body => Promise.reject(body)))
+                        .then(body => {
+                            const code = document.createElement('code');
+                            code.className = 'language-cpp';
+                            code.textContent = body.content || '';
+                            const pre = document.createElement('pre');
+                            pre.appendChild(code);
+                            cd.replaceChildren(pre);
+                            hljs.highlightElement(code);
+                            cb.style.display = 'inline-block';
+                            cb.onclick = () => copyToClipboard(body.content || '').then(showCopyToast).catch(() => alert('复制失败'));
+                        })
+                        .catch(() => { cd.innerHTML = '<p style="color:var(--error-color);">C++ 文件预览失败</p>'; });
                     return;
                 }
                 if (isPreviewableText(filename)) {
@@ -1983,12 +2293,7 @@
                     const cb = w.querySelector('.copy-content-btn');
                     const dw = w.querySelector('.download-window-btn');
                     dw.style.display = 'inline-block';
-                    dw.onclick = () => { const a = document.createElement('a');
-                        a.href = url;
-                        a.download = filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a); };
+                    dw.onclick = () => fileDownload(url, filename);
                     openWindows[url] = w;
                     let xhr = new XMLHttpRequest();
                     xhr.open('GET', url, true);
@@ -2053,12 +2358,7 @@
                     document.body.removeChild(a); });
                 const dw = w.querySelector('.download-window-btn');
                 dw.style.display = 'inline-block';
-                dw.onclick = () => { const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a); };
+                dw.onclick = () => fileDownload(url, filename);
                 openWindows[url] = w;
             }
 
@@ -2073,7 +2373,7 @@
 
             function loadEmojiList(win) {
                 const cd = win.querySelector('.window-content');
-                $.get('/chat/emoji/list/' + currentUser, function(data) {
+                $.get('/chat/emoji/list/' + encodeURIComponent(currentUser) + '?update=' + encodeURIComponent(upd), function(data) {
                     let html = '<button class="emoji-upload-btn" id="emojiUploadBtn">＋ 上传表情包</button>';
                     html += '<div class="emoji-grid">';
                     if (data && data.length > 0) {
@@ -2096,6 +2396,7 @@
                             const fd = new FormData();
                             fd.append('file', file);
                             fd.append('username', currentUser);
+                            fd.append('update', upd);
                             $.ajax({
                                 url: '/chat/emoji/upload',
                                 type: 'POST',
@@ -2125,7 +2426,7 @@
                                 $.ajax({
                                     url: '/chat/emoji/delete',
                                     type: 'POST',
-                                    data: { username: currentUser, filename: fn },
+                                    data: { username: currentUser, filename: fn, update: upd },
                                     success: function(res) {
                                         if (res.success) loadEmojiList(win);
                                         else alert('删除失败: ' + res.error);
@@ -2142,19 +2443,13 @@
 
             function sendEmojiDirect(filename) {
                 const text = '::emoji::' + filename;
-                if (isSending) return;
+                if (isSending || isMuted()) return;
                 isSending = true;
                 stopPolling();
-                $.ajax({
-                    url: '/chatts-new?update=' + upd,
-                    type: 'POST',
-                    data: { upload_value: text, username: currentUser },
-                    success: function(data) { upd = data;
-                        isSending = false;
-                        startPolling(); },
-                    error: function() { alert('发送表情包失败');
-                        isSending = false;
-                        startPolling(); }
+                sendTextMessage(text, function(ok) {
+                    if (!ok) alert('发送表情包失败');
+                    isSending = false;
+                    startPolling();
                 });
             }
             document.getElementById('emojiInputBtn').addEventListener('click', openEmojiWindow);
@@ -2272,15 +2567,66 @@
             // ================================================================
             //  9. 聊天核心（原有，但修改了 update 以支持选择模式）
             // ================================================================
-            var currentUser = '{{ username }}';
-            let upd = "{{ update }}";
+            var currentUser = {{ username|tojson }};
+            let upd = {{ update|tojson }};
+            const currentUserIsAdmin = {{ is_admin|tojson }};
             let tc = 0;
             let lastOnlineUsersStr = null;
-            $('#file-input').on('change', function() {
-                $('#fileHint').text($(this).val().split('\\').pop() ? '已选择: ' + $(this).val().split('\\').pop() : '');
-            });
-            let updateInterval, loginInterval;
+            let updateInterval, loginInterval, muteInterval;
             let isSending = false;
+            let sessionValid = true;
+            let muteUntil = {{ mute_until|tojson }} * 1000;
+            let clockOffset = 0;
+            let pendingReply = null;
+
+            const fileInput = document.getElementById('file-input');
+            const filePickerBtn = document.getElementById('filePickerBtn');
+            filePickerBtn.addEventListener('click', () => { if (!isMuted()) fileInput.click(); });
+            fileInput.addEventListener('change', function() {
+                const filename = this.files[0] ? this.files[0].name : '';
+                document.getElementById('fileHint').textContent = filename ? '已选择: ' + filename : '';
+            });
+
+            function formatRemaining(seconds) {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const rest = seconds % 60;
+                if (hours) return hours + '小时 ' + minutes + '分';
+                if (minutes) return minutes + '分 ' + rest + '秒';
+                return rest + '秒';
+            }
+
+            function isMuted() {
+                return muteUntil > Date.now() + clockOffset;
+            }
+
+            function setMuteState(until, serverTime) {
+                const numericUntil = Number(until || 0) * 1000;
+                if (Number.isFinite(serverTime)) clockOffset = serverTime * 1000 - Date.now();
+                muteUntil = Number.isFinite(numericUntil) ? numericUntil : 0;
+                const status = document.getElementById('muteStatus');
+                if (!status) return;
+                if (isMuted()) {
+                    status.classList.add('active');
+                    status.textContent = '当前处于禁言状态，剩余 ' + formatRemaining(Math.max(1, Math.ceil((muteUntil - Date.now() - clockOffset) / 1000))) + '。';
+                } else {
+                    status.classList.remove('active');
+                    status.textContent = '';
+                }
+                const controls = [
+                    document.getElementById('upft'), document.getElementById('file-input'),
+                    document.getElementById('filePickerBtn'), document.getElementById('sendBtn'),
+                    document.getElementById('textFileSendBtn'), document.getElementById('emojiInputBtn')
+                ];
+                controls.forEach(control => { if (control) control.disabled = isMuted(); });
+            }
+
+            function updateMuteCountdown() {
+                if (muteUntil && !isMuted()) setMuteState(0);
+                else setMuteState(muteUntil / 1000);
+            }
+            setMuteState(muteUntil / 1000);
+            muteInterval = setInterval(updateMuteCountdown, 1000);
 
             function stopPolling() {
                 if (updateInterval) clearInterval(updateInterval);
@@ -2295,6 +2641,30 @@
                 updateInterval = setInterval(update, 3000);
                 loginInterval = setInterval(login, 3000);
             }
+
+            function handleAjaxError(xhr, fallback) {
+                let body = xhr && xhr.responseJSON;
+                if (!body && xhr && xhr.responseText) {
+                    try { body = JSON.parse(xhr.responseText); } catch (_) { body = null; }
+                }
+                if (body && body.muted_until) setMuteState(body.muted_until);
+                alert((body && body.error) || fallback);
+            }
+
+            function clearReply() {
+                pendingReply = null;
+                document.getElementById('replyCompose').classList.remove('active');
+                document.getElementById('replyComposeText').textContent = '';
+            }
+
+            function setReplyTarget(message) {
+                pendingReply = message;
+                document.getElementById('replyComposeText').textContent = message.user + ': ' + messageSummary(message);
+                document.getElementById('replyCompose').classList.add('active');
+                document.getElementById('upft').focus();
+            }
+            document.getElementById('cancelReplyBtn').addEventListener('click', clearReply);
+
             const sendBtn = document.getElementById('sendBtn');
             const warningHint = document.getElementById('warningHint') || document.createElement('div');
             warningHint.className = 'warning-hint';
@@ -2305,66 +2675,64 @@
 
             function checkWarning() {
                 const text = $('#upft').val().trim();
-                if (text.startsWith('::file::') || text.startsWith('::img::') || text.startsWith('::wav::') || text
-                    .startsWith('::emoji::')) {
-                    warningHint.style.display = 'block';
-                    warningHint.textContent = '⚠ 该消息可能被解析为特殊类型，直接发送将作为纯文本。';
-                } else {
-                    warningHint.style.display = 'none';
-                }
+                warningHint.style.display = text.startsWith('::file::') || text.startsWith('::img::') || text.startsWith('::wav::') || text.startsWith('::emoji::') ? 'block' : 'none';
+                warningHint.textContent = '该消息会按普通文本发送。';
             }
             $('#upft').on('input', checkWarning);
+
+            function sendTextMessage(text, callback) {
+                $.ajax({
+                    url: '/chatts-new?update=' + encodeURIComponent(upd),
+                    type: 'POST',
+                    data: { upload_value: text, username: currentUser, update: upd, reply_to: pendingReply ? pendingReply.id : '' },
+                    success: function(body) {
+                        upd = body.update || upd;
+                        $('#upft').val('');
+                        clearReply();
+                        callback(true);
+                    },
+                    error: function(xhr) { handleAjaxError(xhr, '文字发送失败'); callback(false); }
+                });
+            }
+
             if (sendBtn) {
                 sendBtn.addEventListener('click', function(e) {
                     e.preventDefault();
-                    if (isSending) return;
-                    const text = $('#upft').val().trim();
-                    const fi = $('#file-input')[0];
-                    const file = fi.files[0];
-                    if (!text && !file) return;
-                    if (text.includes('|')) { alert('消息中不能包含 "|" 字符'); return; }
-                    if (file && file.name.includes('|')) { alert('文件名中不能包含 "|" 字符'); return; }
+                    if (isSending || isMuted()) return;
+                    const text = $('#upft').val();
+                    const file = fileInput.files[0];
+                    if (!text.trim() && !file) return;
                     isSending = true;
                     stopPolling();
-
-                    function uploadFile(cb) {
-                        if (!file) { cb(true); return; }
+                    const replyId = pendingReply ? pendingReply.id : '';
+                    const uploadFile = function(done) {
+                        if (!file) { done(true); return; }
                         const fd = new FormData();
                         fd.append('file', file);
                         fd.append('username', currentUser);
+                        fd.append('update', upd);
+                        fd.append('reply_to', replyId);
                         $.ajax({
-                            url: '/chatts_file?update=' + upd,
-                            type: 'POST',
-                            data: fd,
-                            processData: false,
-                            contentType: false,
-                            success: function(d) { upd = d;
-                                fi.value = '';
-                                $('#fileHint').text('');
-                                cb(true); },
-                            error: function() { alert('文件上传失败');
-                                cb(false); }
+                            url: '/chatts_file?update=' + encodeURIComponent(upd),
+                            type: 'POST', data: fd, processData: false, contentType: false,
+                            success: function(body) {
+                                upd = body.update || upd;
+                                fileInput.value = '';
+                                document.getElementById('fileHint').textContent = '';
+                                done(true);
+                            },
+                            error: function(xhr) { handleAjaxError(xhr, '文件上传失败'); done(false); }
                         });
-                    }
-
-                    function uploadText(cb) {
-                        if (!text) { cb(true); return; }
-                        $.ajax({
-                            url: '/chatts-new?update=' + upd,
-                            type: 'POST',
-                            data: { upload_value: text, username: currentUser },
-                            success: function(d) { upd = d;
-                                $('#upft').val('');
-                                cb(true); },
-                            error: function() { alert('文字发送失败');
-                                cb(false); }
-                        });
-                    }
-                    uploadFile(function(fs) {
-                        uploadText(function(ts) {
+                    };
+                    uploadFile(function(fileOk) {
+                        if (!fileOk) { isSending = false; startPolling(); return; }
+                        if (!text.trim()) {
+                            clearReply();
                             isSending = false;
                             startPolling();
-                        });
+                            return;
+                        }
+                        sendTextMessage(text, function() { isSending = false; startPolling(); });
                     });
                 });
                 $('#upft').on('keydown', function(e) {
@@ -2378,8 +2746,7 @@
                 $('#upft').val('command: ' + $(this).data('cmd')).focus();
             });
             const sessionAlert = document.getElementById('sessionAlert');
-            let sessionValid = true;
-            document.getElementById('alertConfirmBtn').addEventListener('click', () => window.location.replace('/sec'));
+            document.getElementById('alertConfirmBtn').addEventListener('click', () => window.location.replace('/'));
 
             function showSessionAlert() {
                 if (!sessionAlert.classList.contains('active')) {
@@ -2391,7 +2758,8 @@
             startPolling();
 
             function login() { tc += 1; }
-            let last_result = ['', '', '', ''];
+            let last_result = null;
+            let lastMessageSignature = '';
             const BASE_TIMESTAMP = Date.UTC(2026, 1, 1, 16, 0, 0);
 
             function parseTimeToTimestamp(s) {
@@ -2438,6 +2806,7 @@
             // ---- 选择模式相关状态 ----
             let selectMode = false;
             let selectedIds = new Set(); // 存储选中消息的 id
+            const messageCache = new Map();
 
             // ---- 获取消息的唯一 ID ----
             function getMsgId(user, content, time) {
@@ -2494,11 +2863,8 @@
                 // 但 update 会在下次轮询时自动刷新，这里强制刷新一次
                 // 但由于 update 会重新绘制，我们需要保留选中状态
                 // 直接调用 update 会触发网络请求，我们手动重绘已有数据
-                if (last_result && last_result.length >= 4) {
-                    // 用缓存的数据重绘
+                if (last_result) {
                     renderMessages(last_result);
-                } else {
-                    // 否则等下次 update
                 }
                 updateSelectedCount();
             }
@@ -2508,13 +2874,13 @@
                 selectedIds.clear();
                 updateSelectedCount();
                 // 重新渲染
-                if (last_result && last_result.length >= 4) {
+                if (last_result) {
                     renderMessages(last_result);
                 }
             }
 
             // ---- 渲染消息（从 update 中抽离） ----
-            function renderMessages(result) {
+            function renderMessagesLegacy(result) {
                 let chats = result[0].split(' || ');
                 let users = result[1].split(' || ');
                 let colors = result[2].split(' || ');
@@ -2667,33 +3033,330 @@
                 }
             }
 
-            // ---- 更新函数（修改版） ----
+            function normalizePayload(payload) {
+                if (typeof payload === 'string') {
+                    try { payload = JSON.parse(payload); } catch (_) {
+                        const lines = payload.split('\n');
+                        if (lines.length < 4) return null;
+                        const chats = lines[0].split(' || '), users = lines[1].split(' || '), colors = lines[2].split(' || '), times = lines[3].split(' || ');
+                        return normalizePayload({ messages: chats.map((content, i) => ({
+                            id: getMsgId(users[i] || '', content, times[i] || ''), user: users[i] || '', color: colors[i] || '#808080', time: times[i] || '', content, type: null, recalled: false, reply_to: null
+                        })) });
+                    }
+                }
+                if (Array.isArray(payload)) return normalizePayload(payload.join('\n'));
+                if (!payload || !Array.isArray(payload.messages)) return null;
+                const messages = payload.messages.map((message, index) => {
+                    const content = String(message.content == null ? message.chat || '' : message.content);
+                    return {
+                        id: String(message.id || getMsgId(message.user || '', content, message.time || index)),
+                        user: String(message.user || ''),
+                        color: message.color || '#808080',
+                        time: String(message.time || ''),
+                        timestamp: Number(message.timestamp || parseTimeToTimestamp(message.time || '')) || 0,
+                        content,
+                        type: message.type || inferClientMessageType(content, message.user),
+                        recalled: Boolean(message.recalled || message.revoked),
+                        reply_to: message.reply_to ? String(message.reply_to) : null
+                    };
+                }).filter(message => message.user);
+                return {
+                    messages,
+                    current_user: payload.current_user || currentUser,
+                    is_admin: Boolean(payload.is_admin),
+                    muted: Boolean(payload.muted),
+                    muted_until: Number(payload.muted_until || 0),
+                    server_time: Number(payload.server_time || 0)
+                };
+            }
+
+            function inferClientMessageType(content, user) {
+                if (user === 'system' || content === 'clear') return 'system';
+                if (content.startsWith('::img::')) return 'image';
+                if (content.startsWith('::wav::')) return 'audio';
+                if (content.startsWith('::emoji::')) return 'emoji';
+                if (content.startsWith('::file::')) return 'file';
+                return 'text';
+            }
+
+            function attachmentName(message) {
+                const prefixes = ['::img::', '::wav::', '::emoji::', '::file::'];
+                const prefix = prefixes.find(value => message.content.startsWith(value));
+                return prefix ? message.content.slice(prefix.length).trim() : message.content;
+            }
+
+            function messageSummary(message) {
+                if (!message) return '';
+                if (message.recalled) return '消息已撤回';
+                if (['file', 'image', 'audio', 'emoji'].includes(message.type)) return attachmentName(message);
+                return message.content.replace(/\s+/g, ' ').trim();
+            }
+
+            function appendMentionText(parent, text, isOwn) {
+                if (isOwn || !currentUser) {
+                    parent.appendChild(document.createTextNode(text));
+                    return;
+                }
+                const escapedUser = currentUser.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const pattern = new RegExp('(@' + escapedUser + ')(?![\\w\\u4e00-\\u9fff])', 'g');
+                let cursor = 0, match;
+                while ((match = pattern.exec(text))) {
+                    parent.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+                    const mention = document.createElement('span');
+                    mention.className = 'mention';
+                    mention.textContent = match[1];
+                    parent.appendChild(mention);
+                    cursor = match.index + match[0].length;
+                }
+                parent.appendChild(document.createTextNode(text.slice(cursor)));
+            }
+
+            function appendRichText(parent, raw, isOwn) {
+                const urlPattern = /https?:\/\/[^\s<>"'，。！？、]+/gi;
+                let cursor = 0, match;
+                while ((match = urlPattern.exec(raw))) {
+                    let value = match[0], trailing = '';
+                    while (/[.,!?;:)}\]，。！？、]$/.test(value)) {
+                        trailing = value.slice(-1) + trailing;
+                        value = value.slice(0, -1);
+                    }
+                    appendMentionText(parent, raw.slice(cursor, match.index), isOwn);
+                    const isPure = !raw.slice(0, match.index).trim() && !raw.slice(match.index + match[0].length).trim();
+                    if (isPure && isLikelyImageUrl(value)) parent.appendChild(createRemoteImageLink(value));
+                    else parent.appendChild(createExternalLink(value, value));
+                    if (trailing) appendMentionText(parent, trailing, isOwn);
+                    cursor = match.index + match[0].length;
+                }
+                appendMentionText(parent, raw.slice(cursor), isOwn);
+            }
+
+            function isLikelyImageUrl(value) {
+                try {
+                    const url = new URL(value);
+                    return /\.(?:png|jpe?g|gif|bmp|webp|svg|ico)(?:$|[?#])/i.test(url.pathname);
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            function imageFilenameFromUrl(value) {
+                try {
+                    const name = new URL(value).pathname.split('/').pop();
+                    return name || 'image';
+                } catch (_) { return 'image'; }
+            }
+
+            function createExternalLink(url, label) {
+                const link = document.createElement('a');
+                link.className = 'rich-link';
+                link.href = url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = label;
+                return link;
+            }
+
+            function createRemoteImageLink(url) {
+                const link = document.createElement('a');
+                link.href = 'javascript:void(0)';
+                link.className = 'image-preview-link remote-image-link';
+                link.dataset.src = url;
+                link.dataset.filename = imageFilenameFromUrl(url);
+                const image = document.createElement('img');
+                image.src = url;
+                image.alt = url;
+                image.addEventListener('error', () => link.replaceWith(createExternalLink(url, url)));
+                link.appendChild(image);
+                return link;
+            }
+
+            function appendAttachment(parent, message) {
+                const filename = attachmentName(message);
+                if (message.type === 'image') {
+                    const link = document.createElement('a');
+                    link.href = 'javascript:void(0)';
+                    link.className = 'image-preview-link';
+                    link.dataset.src = './static/uploads/' + encodeURIComponent(filename);
+                    link.dataset.filename = filename;
+                    const image = document.createElement('img');
+                    image.src = link.dataset.src;
+                    image.alt = filename;
+                    image.style.maxWidth = '320px';
+                    image.style.maxHeight = '320px';
+                    link.appendChild(image);
+                    parent.appendChild(link);
+                } else if (message.type === 'audio') {
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = './static/uploads/' + encodeURIComponent(filename);
+                    parent.appendChild(audio);
+                } else if (message.type === 'emoji') {
+                    const image = document.createElement('img');
+                    image.className = 'emoji-inline';
+                    image.alt = filename;
+                    image.src = '/chat/emoji/static/' + encodeURIComponent(message.user) + '/' + encodeURIComponent(filename);
+                    image.addEventListener('error', () => {
+                        const fallback = document.createElement('span');
+                        fallback.className = 'message-fallback';
+                        fallback.textContent = '表情包加载失败';
+                        image.replaceWith(fallback);
+                    });
+                    parent.appendChild(image);
+                } else {
+                    const link = document.createElement('a');
+                    link.href = 'javascript:void(0)';
+                    link.className = 'file-link rich-link';
+                    link.dataset.url = './static/uploads/' + encodeURIComponent(filename);
+                    link.dataset.filename = filename;
+                    link.textContent = '[文件] ' + filename;
+                    parent.appendChild(link);
+                }
+            }
+
+            function bindMessageLinks() {
+                document.querySelectorAll('#message-list .file-link').forEach(link => {
+                    link.addEventListener('click', event => {
+                        event.preventDefault();
+                        openFileWindow(link.dataset.url, link.dataset.filename);
+                    });
+                });
+                document.querySelectorAll('#message-list .image-preview-link').forEach(link => {
+                    link.addEventListener('click', event => {
+                        event.preventDefault();
+                        openFileWindow(link.dataset.src, link.dataset.filename || imageFilenameFromUrl(link.dataset.src));
+                    });
+                });
+                document.querySelectorAll('#message-list .reply-reference').forEach(reference => {
+                    reference.addEventListener('click', () => scrollToMessage(reference.dataset.target));
+                });
+            }
+
+            function renderMessages(result) {
+                const payload = normalizePayload(result);
+                if (!payload) return;
+                messageCache.clear();
+                payload.messages.forEach(message => messageCache.set(message.id, message));
+                const list = document.getElementById('message-list');
+                const scroll = document.getElementById('sd');
+                const shouldStick = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 100;
+                list.replaceChildren();
+                let lastTimestamp = null;
+                payload.messages.forEach(message => {
+                    const timestamp = message.timestamp || parseTimeToTimestamp(message.time);
+                    if (lastTimestamp !== null && timestamp && (timestamp - lastTimestamp) / 1000 > TIME_THRESHOLD) {
+                        const separator = document.createElement('li');
+                        separator.className = 'time-separator';
+                        const separatorText = document.createElement('span');
+                        separatorText.textContent = formatTimeForSeparator(timestamp);
+                        separator.appendChild(separatorText);
+                        list.appendChild(separator);
+                    }
+                    lastTimestamp = timestamp || lastTimestamp;
+
+                    const li = document.createElement('li');
+                    li.dataset.msgId = message.id;
+                    if (message.type === 'system') {
+                        li.className = 'system-row';
+                        const systemText = document.createElement('p');
+                        systemText.className = 'system-message-item';
+                        systemText.textContent = message.content === 'clear' ? '--- 管理员清除了日志 ---' : message.content;
+                        li.appendChild(systemText);
+                        list.appendChild(li);
+                        return;
+                    }
+                    const isOwn = message.user === currentUser;
+                    if (isOwn) li.classList.add('own-message');
+                    const avatar = document.createElement('div');
+                    avatar.className = 'msg-avatar';
+                    avatar.dataset.user = message.user;
+                    avatar.textContent = message.user.charAt(0).toUpperCase();
+                    avatar.style.borderColor = message.color;
+                    avatar.title = message.user;
+                    const content = document.createElement('div');
+                    content.className = 'message-content';
+                    if (!isOwn) {
+                        const sender = document.createElement('div');
+                        sender.className = 'message-sender';
+                        sender.textContent = message.user;
+                        content.appendChild(sender);
+                    }
+                    const bubble = document.createElement('div');
+                    bubble.className = 'message-bubble';
+                    if (message.recalled) {
+                        bubble.classList.add('recalled-bubble');
+                        bubble.textContent = '消息已撤回';
+                    } else if (['file', 'image', 'audio', 'emoji'].includes(message.type)) {
+                        appendAttachment(bubble, message);
+                    } else {
+                        appendRichText(bubble, message.content, isOwn);
+                    }
+                    content.appendChild(bubble);
+                    if (message.reply_to) {
+                        const target = messageCache.get(message.reply_to);
+                        const reference = document.createElement('button');
+                        reference.type = 'button';
+                        reference.className = 'reply-reference';
+                        reference.dataset.target = message.reply_to;
+                        reference.textContent = target ? '回复 ' + target.user + ': ' + messageSummary(target) : '回复的消息已不存在';
+                        content.appendChild(reference);
+                    }
+                    if (message.time) {
+                        const timeText = document.createElement('div');
+                        timeText.className = 'message-time';
+                        timeText.textContent = message.time;
+                        content.appendChild(timeText);
+                    }
+                    if (selectMode) {
+                        const checkboxWrap = document.createElement('div');
+                        checkboxWrap.className = 'msg-checkbox-wrap';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'msg-checkbox';
+                        checkbox.dataset.id = message.id;
+                        checkbox.checked = selectedIds.has(message.id);
+                        checkbox.addEventListener('click', event => event.stopPropagation());
+                        checkbox.addEventListener('change', () => {
+                            if (checkbox.checked) selectedIds.add(message.id);
+                            else selectedIds.delete(message.id);
+                            updateSelectedCount();
+                        });
+                        checkboxWrap.appendChild(checkbox);
+                        if (isOwn) { li.append(content, checkboxWrap); }
+                        else { li.append(checkboxWrap, avatar, content); }
+                    } else {
+                        li.append(avatar, content);
+                    }
+                    list.appendChild(li);
+                });
+                bindMessageLinks();
+                updateSelectedCount();
+                if (shouldStick) scroll.scrollTop = scroll.scrollHeight;
+            }
+
+            // ---- 更新函数：JSON 协议，保留旧四行响应的兼容解析 ----
             function update() {
                 if (!sessionValid) return;
-                let xhr = new XMLHttpRequest();
-                xhr.onreadystatechange = function() {
-                    if (xhr.readyState == 4) {
-                        if (xhr.status === 200) {
-                            if (!isResponseValid(xhr.responseText)) {
-                                showSessionAlert();
-                                return;
-                            }
-                        } else if (xhr.status === 403 || xhr.status === 401) {
-                            showSessionAlert();
-                            return;
-                        } else {
-                            showSessionAlert();
-                            return;
+                $.ajax({
+                    url: 'chattss',
+                    type: 'POST',
+                    data: { username: currentUser, update: upd },
+                    dataType: 'json',
+                    success: function(body) {
+                        const payload = normalizePayload(body);
+                        if (!payload) { showSessionAlert(); return; }
+                        if (payload.server_time) clockOffset = payload.server_time * 1000 - Date.now();
+                        setMuteState(payload.muted_until, payload.server_time);
+                        const signature = JSON.stringify({ messages: payload.messages, muted_until: payload.muted_until });
+                        last_result = payload;
+                        if (signature !== lastMessageSignature) {
+                            lastMessageSignature = signature;
+                            renderMessages(payload);
                         }
-                        let result = xhr.responseText.split('\n');
-                        if (JSON.stringify(result) === JSON.stringify(last_result)) return;
-                        last_result = result;
-                        renderMessages(result);
+                    },
+                    error: function(xhr) {
+                        if (xhr.status === 401 || xhr.status === 403) showSessionAlert();
                     }
-                };
-                xhr.open('post', 'chattss', true);
-                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                xhr.send('username=' + currentUser + '&update=' + upd);
+                });
 
                 // 在线用户
                 let xhr2 = new XMLHttpRequest();
@@ -2728,6 +3391,191 @@
                 c.innerHTML = h;
             }
 
+            function hideActionMenus() {
+                document.getElementById('messageMenu').classList.remove('active');
+                document.getElementById('avatarMenu').classList.remove('active');
+            }
+
+            function positionActionMenu(menu, x, y) {
+                menu.classList.add('active');
+                const rect = menu.getBoundingClientRect();
+                const margin = 8;
+                menu.style.left = Math.max(margin, Math.min(x, window.innerWidth - rect.width - margin)) + 'px';
+                menu.style.top = Math.max(margin, Math.min(y, window.innerHeight - rect.height - margin)) + 'px';
+            }
+
+            let contextMessage = null;
+            let contextUser = null;
+            let dialogCallback = null;
+
+            function openActionDialog(title, message, callback) {
+                document.getElementById('actionDialogTitle').textContent = title;
+                document.getElementById('actionDialogMessage').textContent = message;
+                dialogCallback = callback;
+                const dialog = document.getElementById('actionDialog');
+                dialog.classList.add('active');
+                dialog.setAttribute('aria-hidden', 'false');
+            }
+
+            function closeActionDialog() {
+                const dialog = document.getElementById('actionDialog');
+                dialog.classList.remove('active');
+                dialog.setAttribute('aria-hidden', 'true');
+                dialogCallback = null;
+            }
+            document.getElementById('actionDialogCancel').addEventListener('click', closeActionDialog);
+            document.getElementById('actionDialogConfirm').addEventListener('click', () => {
+                const callback = dialogCallback;
+                closeActionDialog();
+                if (callback) callback();
+            });
+            document.getElementById('actionDialog').addEventListener('click', event => {
+                if (event.target.id === 'actionDialog') closeActionDialog();
+            });
+
+            async function postAction(url, body) {
+                body = Object.assign({}, body, { username: currentUser, update: upd });
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                let result = {};
+                try { result = await response.json(); } catch (_) {}
+                if (!response.ok) {
+                    if (result.muted_until) setMuteState(result.muted_until);
+                    throw new Error(result.error || '操作失败');
+                }
+                return result;
+            }
+
+            function copyMessage(message) {
+                const text = ['file', 'image', 'audio', 'emoji'].includes(message.type) ? attachmentName(message) : message.content;
+                copyToClipboard(text).then(showCopyToast).catch(() => alert('复制失败'));
+            }
+
+            function recallContextMessage() {
+                if (!contextMessage) return;
+                const message = contextMessage;
+                hideActionMenus();
+                openActionDialog('撤回消息', '确认撤回这条消息吗？', () => {
+                    postAction('/api/messages/' + encodeURIComponent(message.id) + '/recall', {})
+                        .then(update)
+                        .catch(error => alert(error.message));
+                });
+            }
+
+            function openMessageMenu(message, x, y) {
+                if (!message || message.type === 'system' || message.recalled) return;
+                contextMessage = message;
+                contextUser = null;
+                hideActionMenus();
+                const menu = document.getElementById('messageMenu');
+                const recallButton = menu.querySelector('[data-action="recall"]');
+                recallButton.style.display = currentUserIsAdmin || message.user === currentUser ? 'block' : 'none';
+                positionActionMenu(menu, x, y);
+            }
+
+            function openAvatarMenu(username, x, y) {
+                if (!currentUserIsAdmin || !username || username === currentUser || username === 'system' || username === 'admin' || username.includes('admin_permission')) return;
+                contextUser = username;
+                contextMessage = null;
+                hideActionMenus();
+                positionActionMenu(document.getElementById('avatarMenu'), x, y);
+            }
+
+            document.getElementById('messageMenu').addEventListener('click', event => {
+                const action = event.target.dataset.action;
+                if (!action || !contextMessage) return;
+                if (action === 'reply') {
+                    setReplyTarget(contextMessage);
+                    hideActionMenus();
+                } else if (action === 'copy') {
+                    copyMessage(contextMessage);
+                    hideActionMenus();
+                } else if (action === 'recall') {
+                    recallContextMessage();
+                }
+            });
+
+            document.getElementById('avatarMenu').addEventListener('click', event => {
+                const action = event.target.dataset.action;
+                const username = contextUser;
+                if (!action || !username) return;
+                hideActionMenus();
+                if (action === 'mute') {
+                    const answer = window.prompt('禁言时长（1-86400 秒）', '60');
+                    if (answer === null) return;
+                    const duration = Number.parseInt(answer, 10);
+                    if (!Number.isInteger(duration) || duration < 1 || duration > 86400) {
+                        alert('禁言时长必须为 1-86400 秒');
+                        return;
+                    }
+                    postAction('/api/mute', { target: username, duration })
+                        .then(update)
+                        .catch(error => alert(error.message));
+                } else if (action === 'unmute') {
+                    openActionDialog('解除禁言', '确认解除 ' + username + ' 的禁言吗？', () => {
+                        postAction('/api/unmute', { target: username })
+                            .then(update)
+                            .catch(error => alert(error.message));
+                    });
+                }
+            });
+
+            document.addEventListener('click', event => {
+                if (!event.target.closest('.message-menu') && !event.target.closest('.avatar-menu')) hideActionMenus();
+            });
+            window.addEventListener('resize', hideActionMenus);
+            window.addEventListener('scroll', hideActionMenus, true);
+
+            const messageList = document.getElementById('message-list');
+            let longPressTimer = null;
+            let longPressStart = null;
+            function cancelLongPress() {
+                if (longPressTimer) clearTimeout(longPressTimer);
+                longPressTimer = null;
+                longPressStart = null;
+            }
+            function openPointerMenu(event) {
+                const bubble = event.target.closest('.message-bubble');
+                const avatar = event.target.closest('.msg-avatar');
+                const li = event.target.closest('li[data-msg-id]');
+                if (bubble && li) openMessageMenu(messageCache.get(li.dataset.msgId), event.clientX, event.clientY);
+                else if (avatar) openAvatarMenu(avatar.dataset.user, event.clientX, event.clientY);
+            }
+            messageList.addEventListener('contextmenu', event => {
+                const target = event.target.closest('.message-bubble, .msg-avatar');
+                if (!target) return;
+                event.preventDefault();
+                openPointerMenu(event);
+            });
+            messageList.addEventListener('pointerdown', event => {
+                if (event.pointerType !== 'touch') return;
+                const target = event.target.closest('.message-bubble, .msg-avatar');
+                if (!target) return;
+                longPressStart = { x: event.clientX, y: event.clientY };
+                longPressTimer = setTimeout(() => {
+                    openPointerMenu(event);
+                    longPressTimer = null;
+                }, 550);
+            });
+            messageList.addEventListener('pointermove', event => {
+                if (!longPressStart) return;
+                if (Math.hypot(event.clientX - longPressStart.x, event.clientY - longPressStart.y) > 12) cancelLongPress();
+            });
+            ['pointerup', 'pointercancel', 'pointerleave'].forEach(type => messageList.addEventListener(type, cancelLongPress));
+
+            function scrollToMessage(messageId) {
+                const element = Array.from(document.querySelectorAll('#message-list li[data-msg-id]')).find(item => item.dataset.msgId === messageId);
+                if (!element) return;
+                element.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                element.classList.remove('message-highlight');
+                void element.offsetWidth;
+                element.classList.add('message-highlight');
+                setTimeout(() => element.classList.remove('message-highlight'), 1900);
+            }
+
             // ================================================================
             //  10. 🆕 分享工具栏事件绑定
             // ================================================================
@@ -2750,23 +3598,19 @@
                 }
                 // 收集选中的消息数据
                 const selectedMsgs = [];
-                if (last_result && last_result.length >= 4) {
-                    const chats = last_result[0].split(' || ');
-                    const users = last_result[1].split(' || ');
-                    const colors = last_result[2].split(' || ');
-                    const times = last_result[3].split(' || ');
-                    for (let i = 0; i < chats.length; i++) {
-                        if (!users[i] || users[i] === '') continue;
-                        const msgId = getMsgId(users[i], chats[i], times[i]);
-                        if (selectedIds.has(msgId)) {
+                if (last_result && Array.isArray(last_result.messages)) {
+                    last_result.messages.forEach(message => {
+                        if (selectedIds.has(message.id)) {
                             selectedMsgs.push({
-                                user: users[i],
-                                content: chats[i],
-                                color: colors[i] || '#666',
-                                time: times[i] || ''
+                                user: message.user,
+                                content: message.content,
+                                color: message.color || '#666',
+                                time: message.time || '',
+                                type: message.type,
+                                recalled: message.recalled
                             });
                         }
-                    }
+                    });
                 }
                 if (selectedMsgs.length === 0) {
                     alert('未找到选中的消息，请重新选择');
@@ -2920,6 +3764,7 @@
                 c.innerHTML =
                     `<div style="display:flex; flex-direction:column; gap:12px;"><input type="text" id="txtFileName" placeholder="文件名（含后缀）" style="background:transparent; border:1px solid var(--border-color); padding:8px; color:var(--fg-primary);"><textarea id="txtFileContent" rows="8" placeholder="文件内容..." style="background:transparent; border:1px solid var(--border-color); padding:8px; color:var(--fg-primary); resize:vertical;"></textarea><button id="txtSendBtn" style="background:transparent; border:2px solid var(--border-color); color:var(--fg-primary); padding:8px; cursor:pointer;">发送</button></div>`;
                 c.querySelector('#txtSendBtn').addEventListener('click', () => {
+                    if (isMuted()) return;
                     const name = c.querySelector('#txtFileName').value.trim();
                     const content = c.querySelector('#txtFileContent').value;
                     if (!name || !content) return;
@@ -2930,15 +3775,19 @@
                     const blob = new Blob([content], { type: 'text/plain' });
                     const fd = new FormData();
                     fd.append('file', blob, name);
+                    fd.append('username', currentUser);
+                    fd.append('update', upd);
+                    fd.append('reply_to', pendingReply ? pendingReply.id : '');
                     $.ajax({
-                        url: '/chatts_file?update=' + upd,
+                        url: '/chatts_file?update=' + encodeURIComponent(upd),
                         type: 'POST',
                         data: fd,
                         processData: false,
                         contentType: false,
-                        success: function(d) { upd = d;
+                        success: function(body) { upd = body.update || upd;
+                            clearReply();
                             document.body.removeChild(w); },
-                        error: function() { alert('发送失败'); }
+                        error: function(xhr) { handleAjaxError(xhr, '发送失败'); }
                     });
                 });
             }
@@ -2965,6 +3814,7 @@
                 renderMessages: renderMessages,
             };
 
+            update();
             console.log('✅ 选择消息生成分享图片功能已加载');
         });
     </script>

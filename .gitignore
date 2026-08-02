@@ -1,1 +1,8 @@
 .idea/
+__pycache__/
+*.pyc
+log.txt
+login_users.txt
+login_passes.txt
+static/uploads/
+static/emoji/

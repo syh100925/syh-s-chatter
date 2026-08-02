@@ -9,6 +9,7 @@
 ## ✨ 功能特性
 
 - 💬 **实时消息**：通过轮询刷新，实现近实时聊天体验
+- 🧩 **结构化消息**：JSON 消息 ID、回复引用、软撤回、系统公告与服务端禁言状态
 - 👤 **用户系统**：自定义昵称与颜色，密码使用 `werkzeug` 哈希存储
 - 📎 **文件上传**：自动识别图片、音频、普通文件，并添加标记（`::img::`、`::wav::`、`::file::`）
 - 👑 **管理员命令**：
@@ -25,7 +26,7 @@
 ## 📦 环境要求
 
 - Python 3.6 及以上
-- MongoDB 服务器（本地或远程）
+- MongoDB 服务器（本地或远程；生产环境建议启用以持久化消息）
 - pip（Python 包管理器）
 
 ---
@@ -42,10 +43,10 @@ cd syh-s-chatter
 ### 2. 安装 Python 依赖
 
 ```bash
-pip install flask pymongo werkzeug
+pip install -r requirements.txt
 ```
 
-> `werkzeug` 提供了密码哈希与安全文件名处理。
+> `werkzeug` 提供了密码哈希与安全文件名处理；`charset-normalizer` 仅用于 `.cpp` 文件的在线预览和复制，原始下载仍保持字节不变。若本机暂时没有 MongoDB，服务会使用 `mongomock` 内存回退，重启后消息不会保留。
 
 ### 3. 准备用户数据文件
 
@@ -189,7 +190,8 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制为 16MB
   - `chat` – 消息内容
   - `user` – 发送者
   - `color` – 用户颜色
-  - `time` – 时间（格式：`年:月:日:时:分`）
+- `time` – 时间（格式：`年:月:日:时:分`）
+- `id`、`content`、`type`、`recalled`、`reply_to`、`created_at` – 新消息协议字段；旧文档仍可读取
 
 > 备用数据库 `chats_z` 已预留，但当前版本未开放相关路由，未来可扩展。
 
