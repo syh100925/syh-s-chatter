@@ -39,7 +39,7 @@ else:
 
 app = Flask(__name__)
 
-logger = logging.getLogger('hzx-chat')
+logger = logging.getLogger('syh-chatter')
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     file_handler = logging.FileHandler(os.path.join(BASE_DIR, 'log.txt'))
