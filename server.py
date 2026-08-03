@@ -27,13 +27,14 @@ def save_config(config):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
 
+# 加载配置
 config = load_config()
 server_ip = config.get('server_ip', '')
 database_ip = config.get('db_ip', '127.0.0.1')
 database_port = config.get('db_port', '27017')
 database_user = config.get('db_user', '')
 database_password = config.get('db_pass', '')
-
+admins = config.get('admins', ['admin'])   # 管理员用户名列表
 
 def read_lines(filename):
     try:
@@ -107,8 +108,8 @@ def get_current_time():
 
 
 def is_admin(username):
-    """Admin is deliberately case-sensitive and does not use substring matching for `admin`."""
-    return username == 'admin' or 'admin_permission' in (username or '')
+    """检查用户名是否在管理员列表中（从 config.json 读取）"""
+    return username in admins
 
 
 def get_user_color(username):
@@ -481,6 +482,8 @@ def _cpp_path(filename):
 
 @app.route('/init', methods=['GET', 'POST'])
 def init_page():
+    global database_ip, database_port, database_user, database_password, server_ip, admins
+    global usernames, passwords, user_colors, client, db, database, mutes
     # 如果已经初始化过（有 config.json 且至少有一个用户），则禁止再次访问
     if os.path.exists(CONFIG_FILE) and os.path.exists(os.path.join(BASE_DIR, 'usernames.list')):
         with open(os.path.join(BASE_DIR, 'usernames.list'), 'r', encoding='utf-8') as f:
@@ -503,6 +506,7 @@ def init_page():
     db_port = request.form.get('db_port', '').strip()
     db_user = request.form.get('db_user', '').strip()
     db_pass = request.form.get('db_pass', '').strip()
+    new_server_ip = request.form.get('server_ip', '').strip()   # 从表单获取服务器 IP
     admin_user = request.form.get('admin_user', '').strip()
     admin_pass = request.form.get('admin_pass', '').strip()
     admin_pass_confirm = request.form.get('admin_pass_confirm', '').strip()
@@ -512,11 +516,11 @@ def init_page():
     if not db_ip or not db_port or not admin_user or not admin_pass:
         return render_template('init.html', error='所有必填字段不能为空',
                                db_ip=db_ip, db_port=db_port, db_user=db_user, db_pass=db_pass,
-                               admin_user=admin_user, invite_count=invite_count)
+                               server_ip=server_ip, admin_user=admin_user, invite_count=invite_count)
     if admin_pass != admin_pass_confirm:
         return render_template('init.html', error='管理员密码不一致',
                                db_ip=db_ip, db_port=db_port, db_user=db_user, db_pass=db_pass,
-                               admin_user=admin_user, invite_count=invite_count)
+                               server_ip=server_ip, admin_user=admin_user, invite_count=invite_count)
     try:
         invite_count = int(invite_count)
         if invite_count < 1:
@@ -525,20 +529,21 @@ def init_page():
         invite_count = 5
 
     # 将配置写入全局变量（供后续连接使用）
-    global database_ip, database_port, database_user, database_password, server_ip
     database_ip = db_ip
     database_port = db_port
     database_user = db_user
     database_password = db_pass
-    server_ip = server_ip
+    server_ip = new_server_ip
+    admins = [admin_user]   # 初始化管理员列表
 
-    # 保存配置（注意：密码可能明文保存，若需加密可后续改进，但此系统内网使用居多）
+    # 保存配置（包含管理员列表）
     new_config = {
         'db_ip': db_ip,
         'db_port': db_port,
         'db_user': db_user,
         'db_pass': db_pass,
         'server_ip': server_ip,
+        'admins': admins,   # 存储管理员用户名列表
     }
     save_config(new_config)
 
@@ -551,7 +556,7 @@ def init_page():
     if admin_user in existing_users:
         return render_template('init.html', error='管理员用户名已存在，请更换',
                                db_ip=db_ip, db_port=db_port, db_user=db_user, db_pass=db_pass,
-                               admin_user=admin_user, invite_count=invite_count)
+                               server_ip=server_ip, admin_user=admin_user, invite_count=invite_count)
 
     hashed = generate_password_hash(admin_pass)
     with open(usernames_path, 'a', encoding='utf-8') as f:
@@ -572,13 +577,11 @@ def init_page():
         f.write('\n'.join(sorted(existing_codes)) + '\n')
 
     # 更新全局用户列表
-    global usernames, passwords, user_colors
     usernames = read_lines('usernames.list')
     passwords = read_lines('passwords.list')
     user_colors = read_lines('colors.list')
 
     # 重新连接数据库（使用新配置）
-    global client, db, database, mutes
     client = create_database_client()
     db = client['chats']
     database = db['values']
@@ -592,12 +595,40 @@ def init_page():
     # 读取所有邀请码用于展示
     generated_codes = read_lines('invite_code.txt')
 
-    # 渲染完成页面（传递邀请码列表和管理员名、数据库IP）
+    # 渲染完成页面（传递邀请码列表和管理员名、数据库IP、服务器IP）
     return render_template('init_complete.html',
                            admin_user=admin_user,
                            invite_codes=generated_codes,
                            db_ip=database_ip,
                            server_ip=server_ip)
+
+@app.route('/init/ping', methods=['POST'])
+def init_ping():
+    """测试数据库连接（用于初始化页面）"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': '缺少请求数据'}), 400
+
+    db_ip = data.get('db_ip', '').strip()
+    db_port = data.get('db_port', '').strip()
+    db_user = data.get('db_user', '').strip()
+    db_pass = data.get('db_pass', '').strip()
+
+    if not db_ip or not db_port:
+        return jsonify({'success': False, 'message': '数据库IP和端口不能为空'}), 400
+
+    # 构建临时连接字符串
+    if db_user or db_pass:
+        uri = f"mongodb://{db_user}:{db_pass}@{db_ip}:{db_port}"
+    else:
+        uri = f"mongodb://{db_ip}:{db_port}"
+
+    try:
+        client = MongoClient(uri, serverSelectionTimeoutMS=2000)
+        client.admin.command('ping')
+        return jsonify({'success': True, 'message': '✅ 连接成功'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'❌ 连接失败: {str(e)}'})
 
 @app.route('/')
 def normal():
@@ -998,6 +1029,8 @@ def emoji_delete():
 
 @app.before_request
 def check_initialized():
+    if request.path.startswith('/static') or request.path in ('/init', '/init/ping', '/favicon.ico'):
+        return
     # 排除静态文件、初始化页面、错误页面等
     if request.path.startswith('/static') or request.path == '/init' or request.path == '/favicon.ico':
         return
