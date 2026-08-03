@@ -263,6 +263,12 @@
                     <input type="password" id="db_pass" name="db_pass" value="{{ db_pass or '' }}">
                 </div>
             </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin: 8px 0 16px 0;">
+                <button type="button" id="testDbBtn" style="background: transparent; border: 1px solid var(--border-color); color: var(--fg-secondary); padding: 6px 18px; font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer; letter-spacing: 1px; transition: all 0.2s;">
+                    🔌 测试连接
+                </button>
+                <span id="pingResult" style="font-size: 0.8rem; color: var(--fg-secondary);"></span>
+            </div>
 
             <!-- 服务器 IP（新增） -->
             <div class="form-group" style="margin-top:1.5rem;">
@@ -335,6 +341,40 @@
                 serverIpInput.value = host;
             }
         })();
+
+        // ===== 测试数据库连接 =====
+        const testBtn = document.getElementById('testDbBtn');
+        const pingResult = document.getElementById('pingResult');
+
+        testBtn.addEventListener('click', async function() {
+            const dbIp = document.getElementById('db_ip').value.trim();
+            const dbPort = document.getElementById('db_port').value.trim();
+            const dbUser = document.getElementById('db_user').value.trim();
+            const dbPass = document.getElementById('db_pass').value.trim();
+
+            if (!dbIp || !dbPort) {
+                pingResult.textContent = '⚠️ 请填写完整的数据库地址和端口';
+                pingResult.style.color = '#ffaa00';
+                return;
+            }
+
+            pingResult.textContent = '⏳ 正在测试...';
+            pingResult.style.color = 'var(--fg-secondary)';
+
+            try {
+                const response = await fetch('/init/ping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ db_ip: dbIp, db_port: dbPort, db_user: dbUser, db_pass: dbPass })
+                });
+                const data = await response.json();
+                pingResult.textContent = data.message;
+                pingResult.style.color = data.success ? '#4caf50' : '#ff4444';
+            } catch (error) {
+                pingResult.textContent = '❌ 请求失败: ' + error.message;
+                pingResult.style.color = '#ff4444';
+            }
+        });
 
         // ===== 提交前确认弹窗 =====
         const form = document.getElementById('initForm');
