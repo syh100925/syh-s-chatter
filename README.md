@@ -1,6 +1,7 @@
 # syh's chatter
 
-一个基于 **Flask** 和 **MongoDB** 的轻量级聊天室应用，支持多用户实时交流、文件上传、管理员控制、邀请码注册等功能。
+一个基于 **Flask** 和 **MongoDB** 的轻量级聊天室应用，支持多用户实时交流、文件上传、管理员控制、邀请码注册等功能。  
+**新特性**：首次启动时提供 **Web 初始化向导**，无需手动编辑配置文件或数据文件，一切通过界面完成。
 
 ![preview](preview.png)
 
@@ -16,9 +17,9 @@
   - `command: clear` – 清空所有聊天记录
   - `command: delete N` – 删除最后 N 条消息
   - `command: change_color 用户名 新颜色` – 修改指定用户的显示颜色（影响后续消息）
-- 🔐 **安全注册**：需要邀请码（`invite_code.txt`）方可注册，注册后邀请码失效
+- 🔐 **安全注册**：需要邀请码方可注册，初始邀请码在首次初始化时自动生成并展示
 - 👥 **在线列表**：动态显示当前在线用户
-- 💾 **MongoDB 持久化**：所有消息存入数据库，支持双聊天室（主聊天室 + `_z` 备用聊天室，代码中已预留但未开放路由）
+- 💾 **MongoDB 持久化**：所有消息存入数据库，重启后数据不丢失（若 MongoDB 不可用，自动降级为内存存储）
 - 🎨 **前端友好**：集成 Font Awesome、Highlight.js、jQuery、html2canvas（通过 CDN 引入）
 
 ---
@@ -26,7 +27,7 @@
 ## 📦 环境要求
 
 - Python 3.6 及以上
-- MongoDB 服务器（本地或远程；生产环境建议启用以持久化消息）
+- MongoDB 服务器（本地或远程；生产环境建议启动以持久化消息）
 - pip（Python 包管理器）
 
 ---
@@ -48,51 +49,67 @@ pip install -r requirements.txt
 
 > `werkzeug` 提供了密码哈希与安全文件名处理；`charset-normalizer` 仅用于 `.cpp` 文件的在线预览和复制，原始下载仍保持字节不变。若本机暂时没有 MongoDB，服务会使用 `mongomock` 内存回退，重启后消息不会保留。
 
-### 3. 准备用户数据文件
+### 3. 首次运行（自动初始化）
 
-项目根目录下需要三个文本文件（**首次运行前必须创建**）：
+**重要**：从本版本开始，您**不再需要**手动创建 `usernames.list`、`passwords.list`、`colors.list` 或 `invite_code.txt`。  
+所有配置和初始数据均可通过 **Web 初始化向导** 完成。
 
-- `usernames.list` – 每行一个用户名（**必须包含 `admin`**）
-- `passwords.list` – 每行一个密码哈希（使用 `werkzeug.security.generate_password_hash` 生成）
-- `colors.list` – 每行一个 CSS 颜色值（如 `red`、`#ff0000`）
-
-> 示例（快速创建 `admin` 账户）：
-> ```bash
-> # 生成密码哈希（在 Python 中执行）
-> python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your_password'))"
-> # 将输出的哈希值写入 passwords.list
-> echo "admin" > usernames.list
-> echo "哈希值" > passwords.list
-> echo "red" > colors.list
-> ```
-
-若缺少这些文件，程序可能无法正常启动。请确保至少存在一个 `admin` 用户。
-
-### 4. 设置邀请码（用于注册）
-
-创建 `invite_code.txt`，每行一个邀请码：
+#### 3.1 启动服务
 
 ```bash
-echo "123456" > invite_code.txt
+python server.py
 ```
 
-新用户注册时需提供有效邀请码，注册后该码将被移除。
+默认监听 `0.0.0.0:5000`。如果您希望更改 IP 或端口，可直接修改 `server.py` 末尾的 `app.run` 参数。
 
-### 5. 配置服务器地址与数据库连接
+#### 3.2 访问初始化页面
 
-编辑 `server.py`，修改以下变量：
+打开浏览器访问 `http://<服务器IP>:5000`（若在本机运行，可使用 `127.0.0.1`）。  
+首次访问时，系统会自动跳转到 `/init` 初始化页面。
 
-```python
-server_ip = 'your_server_ip_or_domain'   # 例如 '192.168.1.100' 或 'example.com'
+#### 3.3 填写配置信息
 
-# MongoDB 连接信息
-database_ip = '127.0.0.1'                # 数据库地址
-database_port = '27017'                  # 端口
-database_user = ''                       # 用户名（若无则留空）
-database_password = ''                   # 密码（若无则留空）
-```
+在初始化页面中，您需要填写：
 
-> **重要**：`server_ip` 必须设置正确，否则聊天页面的跳转链接会生成无效地址（如 `http:///...`）。
+- **MongoDB 连接信息**：数据库 IP、端口、用户名（可选）、密码（可选）  
+- **服务器地址**：用于生成聊天室的跳转链接（例如 `192.168.1.100:5000`）。页面会自动从浏览器地址栏识别当前主机，您也可以手动修改。
+- **管理员账号**：用户名和密码（系统将创建此用户，并赋予管理员权限）
+- **初始邀请码数量**：系统将生成指定数量的邀请码，供新用户注册使用
+
+#### 3.4 测试数据库连接（可选）
+
+在填写数据库信息后，点击 **“测试连接”** 按钮，系统会尝试连接 MongoDB 并返回结果。即使连接失败，您仍可以继续提交（此时将使用内存存储，重启后数据丢失）。
+
+#### 3.5 提交初始化
+
+点击 **“初始化系统”** 按钮，系统将：
+
+- 保存数据库配置（`config.json`）
+- 创建管理员用户（写入 `usernames.list` 等文件）
+- 生成指定数量的邀请码（写入 `invite_code.txt`）
+- 初始化数据库集合（自动创建 `chats.values` 和 `chats.mutes`）
+
+#### 3.6 获取邀请码
+
+初始化完成后，页面会显示所有生成的邀请码，**请妥善保存**。  
+每个邀请码只能使用一次，用于新用户注册。
+
+#### 3.7 开始使用
+
+点击页面上的 **“前往登录”** 按钮，使用管理员账号登录聊天室。
+
+---
+
+### 手动配置（高级用户）
+
+如果您希望绕过初始化向导（例如在无头环境中部署），仍可手动创建所需文件：
+
+- `usernames.list` – 每行一个用户名（**必须包含管理员账户**，初始管理员默认为 `admin`）
+- `passwords.list` – 每行一个密码哈希（使用 `werkzeug.security.generate_password_hash` 生成）
+- `colors.list` – 每行一个 CSS 颜色值（如 `red`、`#ff0000`）
+- `invite_code.txt` – 每行一个邀请码
+
+同时，在 `server.py` 中直接设置 `database_ip`、`database_port` 等变量（不推荐，因为初始化界面更易用）。
 
 ---
 
@@ -122,7 +139,7 @@ python server.py
 
 ## 🛠️ 管理员命令
 
-登录 `admin` 账户后，在聊天输入框中发送以下格式的命令：
+登录管理员账户后，在聊天输入框中发送以下格式的命令：
 
 - `command: clear` – 清空所有消息
 - `command: delete 10` – 删除最后 10 条消息
@@ -185,31 +202,42 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制为 16MB
 ## 🗄️ 数据库结构
 
 - 数据库：`chats`
-- 集合：`values`
-- 文档字段：
-  - `chat` – 消息内容
+- 集合：`values`（存储消息）和 `mutes`（存储禁言记录）
+- 消息文档字段：
+  - `id` – 消息唯一标识（UUID）
   - `user` – 发送者
+  - `content` – 消息内容（包含标记）
   - `color` – 用户颜色
-- `time` – 时间（格式：`年:月:日:时:分`）
-- `id`、`content`、`type`、`recalled`、`reply_to`、`created_at` – 新消息协议字段；旧文档仍可读取
-
-> 备用数据库 `chats_z` 已预留，但当前版本未开放相关路由，未来可扩展。
+  - `time` – 显示时间（格式：`年:月:日:时:分`）
+  - `created_at` – 创建时间戳（用于撤回时间限制）
+  - `type` – 消息类型（`text`、`image`、`audio`、`file`、`emoji`、`system`）
+  - `recalled` – 是否已撤回
+  - `reply_to` – 回复的消息 ID（可选）
 
 ---
 
 ## ❓ 常见问题
 
+**Q：首次访问时没有自动跳转到初始化页面？**  
+A：请检查是否已存在 `config.json` 或 `usernames.list` 文件（若存在，系统会认为已初始化）。删除这些文件后重新访问即可。
+
+**Q：初始化时提示“所有必填字段不能为空”？**  
+A：请确保填写了数据库 IP、端口、管理员用户名和密码。
+
 **Q：登录时提示“认证数据错误”？**  
-A：检查 `usernames.list` 和 `passwords.list` 是否匹配，密码必须使用哈希值。可使用 `generate_password_hash` 重新生成。
+A：检查初始化时创建的管理员密码是否输入正确，或确认 `usernames.list` 和 `passwords.list` 内容未被篡改。
 
 **Q：注册时提示“无效的邀请码”？**  
-A：确保 `invite_code.txt` 存在且包含您输入的邀请码（注意大小写和空格）。
+A：确保使用的是初始化完成后页面显示的邀请码，注意大小写和空格。每个邀请码只能使用一次。
 
 **Q：上传文件后消息未显示？**  
 A：检查 `static/uploads/` 目录是否存在且可写，同时确认文件大小未超过 Flask 限制。
 
 **Q：页面跳转链接无效（如 `http:///...`）？**  
-A：请正确设置 `server_ip` 变量，或改为动态获取主机（可自行修改代码）。
+A：请正确设置 `server_ip` 变量（位于 `server.py` 顶部），或使用初始化界面中的“服务器地址”字段配置。
+
+**Q：聊天记录重启后丢失？**  
+A：这说明应用未能连接到 MongoDB，而是使用了内存存储。请检查 MongoDB 服务是否运行，以及 `config.json` 中的连接信息是否正确。您可以在初始化页面使用“测试连接”功能进行诊断。
 
 ---
 
