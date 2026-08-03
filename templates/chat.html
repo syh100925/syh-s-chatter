@@ -2578,6 +2578,53 @@
             let muteUntil = {{ mute_until|tojson }} * 1000;
             let clockOffset = 0;
             let pendingReply = null;
+            let knownMessageIds = null;
+            let mentionAudioContext = null;
+
+            function unlockMentionAudio() {
+                if (!mentionAudioContext) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioContextClass) return;
+                    mentionAudioContext = new AudioContextClass();
+                }
+                if (mentionAudioContext.state === 'suspended') mentionAudioContext.resume();
+            }
+
+            function playMentionNotification() {
+                unlockMentionAudio();
+                if (!mentionAudioContext || mentionAudioContext.state !== 'running') return;
+                const now = mentionAudioContext.currentTime;
+                const oscillator = mentionAudioContext.createOscillator();
+                const gain = mentionAudioContext.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, now);
+                oscillator.frequency.setValueAtTime(1174, now + 0.09);
+                gain.gain.setValueAtTime(0.0001, now);
+                gain.gain.exponentialRampToValueAtTime(0.16, now + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+                oscillator.connect(gain);
+                gain.connect(mentionAudioContext.destination);
+                oscillator.start(now);
+                oscillator.stop(now + 0.23);
+            }
+
+            function messageMentionsCurrentUser(message) {
+                if (!message || message.user === currentUser || !currentUser) return false;
+                const escapedUser = currentUser.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                return new RegExp('(^|\\s)@' + escapedUser + '(?![\\w\\u4e00-\\u9fff])').test(message.content);
+            }
+
+            function notifyNewMentions(messages) {
+                const currentIds = new Set(messages.map(message => message.id));
+                if (knownMessageIds) {
+                    const hasMention = messages.some(message => knownMessageIds.has(message.id) === false && messageMentionsCurrentUser(message));
+                    if (hasMention) playMentionNotification();
+                }
+                knownMessageIds = currentIds;
+            }
+
+            document.addEventListener('pointerdown', unlockMentionAudio, { once: true });
+            document.addEventListener('keydown', unlockMentionAudio, { once: true });
 
             const fileInput = document.getElementById('file-input');
             const filePickerBtn = document.getElementById('filePickerBtn');
@@ -3346,6 +3393,7 @@
                         if (!payload) { showSessionAlert(); return; }
                         if (payload.server_time) clockOffset = payload.server_time * 1000 - Date.now();
                         setMuteState(payload.muted_until, payload.server_time);
+                        notifyNewMentions(payload.messages);
                         const signature = JSON.stringify({ messages: payload.messages, muted_until: payload.muted_until });
                         last_result = payload;
                         if (signature !== lastMessageSignature) {
