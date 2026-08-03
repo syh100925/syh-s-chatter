@@ -1,4 +1,5 @@
-from flask import Flask, jsonify, redirect, render_template, request, send_from_directory
+from flask import Flask, jsonify, redirect, render_template, request, send_file, send_from_directory
+import io
 import logging
 import os
 import random
@@ -37,7 +38,7 @@ if database_user or database_password:
 else:
     mongo_uri = 'mongodb://' + database_ip + ':' + database_port
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None)
 
 logger = logging.getLogger('hzx-chat')
 logger.setLevel(logging.INFO)
@@ -73,6 +74,8 @@ for filename in ('login_users.txt', 'login_passes.txt'):
 
 ip = server_ip
 loginings = []
+v2_event_publisher = None
+v2_legacy_file_provider = None
 
 IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'bmp', 'gif', 'webp', 'svg', 'ico'}
 AUDIO_EXTENSIONS = {'mp3', 'wav', 'flac', 'ogg', 'm4a'}
@@ -157,6 +160,24 @@ def json_error(message, status=400, **extra):
     body = {'ok': False, 'error': message}
     body.update(extra)
     return jsonify(body), status
+
+
+def set_v2_event_publisher(publisher):
+    global v2_event_publisher
+    v2_event_publisher = publisher
+
+
+def set_v2_legacy_file_provider(provider):
+    global v2_legacy_file_provider
+    v2_legacy_file_provider = provider
+
+
+def notify_v2_event(event_type, document):
+    if callable(v2_event_publisher):
+        try:
+            v2_event_publisher(event_type, document)
+        except Exception as exc:  # pragma: no cover - event delivery is best effort
+            logger.warning('v2 event publish failed: %s', exc)
 
 
 def touch_presence(username):
@@ -259,9 +280,15 @@ def iter_message_docs():
     return database.find().sort('_id', 1)
 
 
+def is_legacy_public_message(doc):
+    return doc.get('conversation_id') in (None, '', 'public')
+
+
 def get_messages():
     messages = []
     for index, doc in enumerate(iter_message_docs()):
+        if not is_legacy_public_message(doc):
+            continue
         if not doc.get('user'):
             continue
         messages.append(serialize_message(doc, index))
@@ -282,10 +309,10 @@ def get_data():
 def find_message(message_id):
     message_id = str(message_id or '')
     doc = database.find_one({'id': message_id})
-    if doc:
+    if doc and is_legacy_public_message(doc):
         return doc
     for index, candidate in enumerate(iter_message_docs()):
-        if legacy_message_id(candidate, index) == message_id:
+        if is_legacy_public_message(candidate) and legacy_message_id(candidate, index) == message_id:
             return candidate
     return None
 
@@ -305,6 +332,7 @@ def add_system_message(content):
         'reply_to': None,
     }
     database.insert_one(document)
+    notify_v2_event('message.created', document)
     return serialize_message(document)
 
 
@@ -334,6 +362,7 @@ def add_chat(username, value, d_time=None, reply_to=None, message_type=None, che
         'reply_to': str(reply_to) if reply_to else None,
     }
     database.insert_one(document)
+    notify_v2_event('message.created', document)
     return serialize_message(document)
 
 
@@ -384,6 +413,7 @@ def admin_command(username, command_str, d_time):
         'reply_to': None,
     }
     database.insert_one(document)
+    notify_v2_event('message.created', document)
     return serialize_message(document)
 
 
@@ -463,6 +493,29 @@ def _cpp_path(filename):
     upload_dir = os.path.abspath(os.path.join(BASE_DIR, 'static', 'uploads'))
     path = os.path.abspath(os.path.join(upload_dir, safe))
     return path if os.path.dirname(path) == upload_dir else None
+
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    """Serve legacy files first and let GridFS resolve migrated filenames."""
+    static_root = os.path.abspath(os.path.join(BASE_DIR, 'static'))
+    requested = os.path.abspath(os.path.join(static_root, filename))
+    if os.path.commonpath((static_root, requested)) != static_root:
+        return json_error('文件路径无效', 404)
+    if os.path.isfile(requested):
+        return send_from_directory(static_root, filename)
+    if filename.startswith('uploads/') and callable(v2_legacy_file_provider):
+        legacy_name = filename[len('uploads/'):]
+        result = v2_legacy_file_provider(legacy_name)
+        if result:
+            content, mime, download_name = result
+            return send_file(
+                io.BytesIO(content),
+                mimetype=mime,
+                download_name=download_name,
+                max_age=3600,
+            )
+    return json_error('文件不存在', 404)
 
 
 @app.route('/')
@@ -703,13 +756,14 @@ def recall_message(message_id=None):
     document, error_message = _message_for_recall(message_id, username)
     if error_message:
         return json_error(error_message, 403 if '只能' in error_message else 404)
-    update = {'$set': {'recalled': True, 'recalled_at': time.time()}}
+    message_id = str(message_id)
     if document.get('_id') is not None:
-        database.update_one({'_id': document['_id']}, update)
+        database.delete_one({'_id': document['_id']})
     elif document.get('id'):
-        database.update_one({'id': document['id']}, update)
+        database.delete_one({'id': document['id']})
     _delete_attachment(document)
-    return jsonify({'ok': True, 'id': str(message_id)})
+    notify_v2_event('message.deleted', document)
+    return jsonify({'ok': True, 'id': message_id})
 
 
 def _mute_target_from_request():
@@ -792,12 +846,12 @@ def cpp_preview():
 
 
 def _emoji_directory(username):
-    safe_user = secure_filename(username or '')
-    if not safe_user:
+    safe_user = str(username or '')
+    if not safe_user or safe_user in {'.', '..'} or '/' in safe_user or '\\' in safe_user or os.path.basename(safe_user) != safe_user:
         return None
     path = os.path.abspath(os.path.join(BASE_DIR, 'static', 'emoji', safe_user))
     root = os.path.abspath(os.path.join(BASE_DIR, 'static', 'emoji'))
-    return path if os.path.dirname(path) == root else None
+    return path if os.path.commonpath((root, path)) == root else None
 
 
 @app.route('/chat/emoji/list/<username>', methods=['GET'])
@@ -814,8 +868,8 @@ def emoji_list(username):
 @app.route('/chat/emoji/static/<username>/<filename>', methods=['GET'])
 def emoji_static(username, filename):
     directory = _emoji_directory(username)
-    safe = secure_filename(filename)
-    if not directory or not safe or safe != filename:
+    safe = str(filename or '')
+    if not directory or not safe or safe in {'.', '..'} or '/' in safe or '\\' in safe or os.path.basename(safe) != safe:
         return json_error('文件不存在', 404)
     return send_from_directory(directory, safe)
 
@@ -853,7 +907,9 @@ def emoji_delete():
     if target != actor and not is_admin(actor):
         return json_error('没有权限', 403)
     directory = _emoji_directory(target)
-    filename = secure_filename(payload.get('filename', ''))
+    filename = str(payload.get('filename', '') or '')
+    if '/' in filename or '\\' in filename or os.path.basename(filename) != filename:
+        filename = ''
     if not directory or not filename:
         return json_error('文件名无效', 400)
     path = os.path.join(directory, filename)
@@ -861,6 +917,41 @@ def emoji_delete():
         return json_error('文件不存在', 404)
     os.remove(path)
     return jsonify({'success': True})
+
+
+def _v2_users():
+    global usernames, passwords, user_colors
+    usernames = read_lines('usernames.list')
+    passwords = read_lines('passwords.list')
+    user_colors = read_lines('colors.list')
+    return [
+        {
+            'username': username,
+            'password': passwords[index] if index < len(passwords) else '',
+        }
+        for index, username in enumerate(usernames)
+    ]
+
+
+from api_v2 import register_v2_api
+
+
+v2_service = register_v2_api(app, {
+    'base_dir': BASE_DIR,
+    'db': db,
+    'database': database,
+    'mutes': mutes,
+    'get_users': _v2_users,
+    'get_user_color': get_user_color,
+    'get_current_time': get_current_time,
+    'infer_message_type': infer_message_type,
+    'ensure_not_muted': ensure_not_muted,
+    'touch_presence': touch_presence,
+    'is_admin': is_admin,
+    'delete_legacy_attachment': _delete_attachment,
+    'set_event_publisher': set_v2_event_publisher,
+    'set_legacy_file_provider': set_v2_legacy_file_provider,
+})
 
 
 if __name__ == '__main__':

@@ -6,3 +6,10 @@ login_users.txt
 login_passes.txt
 static/uploads/
 static/emoji/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/node_modules/.tmp/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
