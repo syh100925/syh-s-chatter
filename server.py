@@ -4,6 +4,7 @@ import os
 import random
 import time
 import uuid
+import json
 from datetime import datetime
 
 from pymongo import MongoClient
@@ -12,12 +13,26 @@ from werkzeug.utils import secure_filename
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-server_ip = ''
+CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 
-database_ip = '127.0.0.1'  # YOUR IP
-database_port = '27017'
-database_user = ''
-database_password = ''
+def load_config():
+    """从 config.json 加载配置，若不存在则返回默认空配置"""
+    if not os.path.exists(CONFIG_FILE):
+        return {}
+    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def save_config(config):
+    """保存配置到 config.json"""
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+
+config = load_config()
+server_ip = config.get('server_ip', '')
+database_ip = config.get('db_ip', '127.0.0.1')
+database_port = config.get('db_port', '27017')
+database_user = config.get('db_user', '')
+database_password = config.get('db_pass', '')
 
 
 def read_lines(filename):
@@ -464,6 +479,125 @@ def _cpp_path(filename):
     path = os.path.abspath(os.path.join(upload_dir, safe))
     return path if os.path.dirname(path) == upload_dir else None
 
+@app.route('/init', methods=['GET', 'POST'])
+def init_page():
+    # 如果已经初始化过（有 config.json 且至少有一个用户），则禁止再次访问
+    if os.path.exists(CONFIG_FILE) and os.path.exists(os.path.join(BASE_DIR, 'usernames.list')):
+        with open(os.path.join(BASE_DIR, 'usernames.list'), 'r', encoding='utf-8') as f:
+            if f.read().strip():
+                return redirect('/')
+
+    if request.method == 'GET':
+        cfg = load_config()
+        return render_template('init.html',
+                               db_ip=cfg.get('db_ip', '127.0.0.1'),
+                               db_port=cfg.get('db_port', '27017'),
+                               db_user=cfg.get('db_user', ''),
+                               db_pass=cfg.get('db_pass', ''),
+                               server_ip=cfg.get('server_ip', ''),
+                               admin_user='admin',
+                               error=None)
+
+    # POST 处理
+    db_ip = request.form.get('db_ip', '').strip()
+    db_port = request.form.get('db_port', '').strip()
+    db_user = request.form.get('db_user', '').strip()
+    db_pass = request.form.get('db_pass', '').strip()
+    admin_user = request.form.get('admin_user', '').strip()
+    admin_pass = request.form.get('admin_pass', '').strip()
+    admin_pass_confirm = request.form.get('admin_pass_confirm', '').strip()
+    invite_count = request.form.get('invite_count', '5').strip()
+
+    # 基本验证
+    if not db_ip or not db_port or not admin_user or not admin_pass:
+        return render_template('init.html', error='所有必填字段不能为空',
+                               db_ip=db_ip, db_port=db_port, db_user=db_user, db_pass=db_pass,
+                               admin_user=admin_user, invite_count=invite_count)
+    if admin_pass != admin_pass_confirm:
+        return render_template('init.html', error='管理员密码不一致',
+                               db_ip=db_ip, db_port=db_port, db_user=db_user, db_pass=db_pass,
+                               admin_user=admin_user, invite_count=invite_count)
+    try:
+        invite_count = int(invite_count)
+        if invite_count < 1:
+            invite_count = 1
+    except ValueError:
+        invite_count = 5
+
+    # 将配置写入全局变量（供后续连接使用）
+    global database_ip, database_port, database_user, database_password, server_ip
+    database_ip = db_ip
+    database_port = db_port
+    database_user = db_user
+    database_password = db_pass
+    server_ip = server_ip
+
+    # 保存配置（注意：密码可能明文保存，若需加密可后续改进，但此系统内网使用居多）
+    new_config = {
+        'db_ip': db_ip,
+        'db_port': db_port,
+        'db_user': db_user,
+        'db_pass': db_pass,
+        'server_ip': server_ip,
+    }
+    save_config(new_config)
+
+    # 创建管理员用户
+    usernames_path = os.path.join(BASE_DIR, 'usernames.list')
+    passwords_path = os.path.join(BASE_DIR, 'passwords.list')
+    colors_path = os.path.join(BASE_DIR, 'colors.list')
+
+    existing_users = read_lines('usernames.list')
+    if admin_user in existing_users:
+        return render_template('init.html', error='管理员用户名已存在，请更换',
+                               db_ip=db_ip, db_port=db_port, db_user=db_user, db_pass=db_pass,
+                               admin_user=admin_user, invite_count=invite_count)
+
+    hashed = generate_password_hash(admin_pass)
+    with open(usernames_path, 'a', encoding='utf-8') as f:
+        f.write(admin_user + '\n')
+    with open(passwords_path, 'a', encoding='utf-8') as f:
+        f.write(hashed + '\n')
+    with open(colors_path, 'a', encoding='utf-8') as f:
+        f.write('#ffffff\n')  # 默认白色
+
+    # 生成邀请码
+    invite_path = os.path.join(BASE_DIR, 'invite_code.txt')
+    import random, string
+    existing_codes = set(read_lines('invite_code.txt'))
+    for _ in range(invite_count):
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        existing_codes.add(code)
+    with open(invite_path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(sorted(existing_codes)) + '\n')
+
+    # 更新全局用户列表
+    global usernames, passwords, user_colors
+    usernames = read_lines('usernames.list')
+    passwords = read_lines('passwords.list')
+    user_colors = read_lines('colors.list')
+
+    # 重新连接数据库（使用新配置）
+    global client, db, database, mutes
+    client = create_database_client()
+    db = client['chats']
+    database = db['values']
+    mutes = db['mutes']
+
+    # 插入一条系统消息（可选）
+    add_system_message('系统初始化完成，管理员 %s 已创建' % admin_user)
+
+    logger.info('系统初始化完成，管理员：%s', admin_user)
+
+    # 读取所有邀请码用于展示
+    generated_codes = read_lines('invite_code.txt')
+
+    # 渲染完成页面（传递邀请码列表和管理员名、数据库IP）
+    return render_template('init_complete.html',
+                           admin_user=admin_user,
+                           invite_codes=generated_codes,
+                           db_ip=database_ip,
+                           server_ip=server_ip)
 
 @app.route('/')
 def normal():
@@ -862,6 +996,18 @@ def emoji_delete():
     os.remove(path)
     return jsonify({'success': True})
 
+@app.before_request
+def check_initialized():
+    # 排除静态文件、初始化页面、错误页面等
+    if request.path.startswith('/static') or request.path == '/init' or request.path == '/favicon.ico':
+        return
+    # 检查是否已配置（存在 config.json 且存在至少一个用户）
+    if not os.path.exists(CONFIG_FILE) or not os.path.exists(os.path.join(BASE_DIR, 'usernames.list')):
+        return redirect('/init')
+    # 如果 config.json 存在但无任何用户，也重定向（极端情况）
+    with open(os.path.join(BASE_DIR, 'usernames.list'), 'r', encoding='utf-8') as f:
+        if not f.read().strip():
+            return redirect('/init')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

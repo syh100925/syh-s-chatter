@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syh-Chatter · 初始化</title>
+    <link rel="shortcut icon" href="static/icon.png" type="image/x-icon">
+    <style>
+        /* ========== 扁平主题变量（与 login.html 保持一致） ========== */
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #242424;
+            --fg-primary: #e0e0e0;
+            --fg-secondary: #999999;
+            --fg-muted: #666666;
+            --border-color: #3a3a3a;
+            --border-focus: #e0e0e0;
+            --accent: #ffffff;
+            --accent-hover-text: #1a1a1a;
+            --font-mono: 'Jetbrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+            --transition-speed: 0.2s;
+        }
+        body.light-theme {
+            --bg-primary: #fafafa;
+            --bg-secondary: #f0f0f0;
+            --fg-primary: #1a1a1a;
+            --fg-secondary: #555555;
+            --fg-muted: #999999;
+            --border-color: #cccccc;
+            --border-focus: #1a1a1a;
+            --accent: #1a1a1a;
+            --accent-hover-text: #ffffff;
+        }
+        @font-face {
+            font-family: 'Jetbrains Mono';
+            src: url('static/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: var(--bg-primary);
+            font-family: var(--font-mono);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--fg-primary);
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+            -webkit-font-smoothing: antialiased;
+        }
+        .theme-toggle {
+            position: fixed;
+            top: 24px;
+            right: 28px;
+            z-index: 100;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--fg-secondary);
+            padding: 10px 18px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            letter-spacing: 2px;
+            transition: all var(--transition-speed);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .theme-toggle:hover {
+            color: var(--fg-primary);
+            border-color: var(--fg-primary);
+        }
+        .theme-toggle .mode-text {
+            display: inline-block;
+            min-width: 2.5em;
+            text-align: center;
+            transition: color 0.3s;
+            animation: textPulse 2s infinite;
+        }
+        @keyframes textPulse {
+            0%,100% { opacity:0.7; }
+            50% { opacity:1; }
+        }
+        .container {
+            width: 100%;
+            max-width: 480px;
+            padding: 0 2rem;
+            text-align: center;
+        }
+        .brand {
+            font-size: 0.75rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            height: 20px;
+        }
+        .brand .dash {
+            display: inline-block;
+            width: 20px;
+            height: 1px;
+            background: var(--border-color);
+        }
+        .title {
+            margin-bottom: 2.5rem;
+        }
+        .title h1 {
+            font-size: 2rem;
+            letter-spacing: 6px;
+            font-weight: 400;
+            color: var(--fg-primary);
+            text-transform: uppercase;
+        }
+        .title .divider {
+            display: block;
+            width: 40px;
+            height: 2px;
+            background: var(--border-color);
+            margin: 0.8rem auto 1rem;
+        }
+        .title p {
+            color: var(--fg-muted);
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .form-group {
+            margin: 1.8rem 0;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--fg-secondary);
+            margin-bottom: 6px;
+        }
+        .form-group input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--border-color);
+            padding: 10px 4px 8px;
+            font-size: 0.95rem;
+            color: var(--fg-primary);
+            font-family: var(--font-mono);
+            outline: none;
+            transition: border-color var(--transition-speed);
+            border-radius: 0;
+        }
+        .form-group input:focus {
+            border-bottom-color: var(--border-focus);
+        }
+        .form-group .hint {
+            font-size: 0.65rem;
+            color: var(--fg-muted);
+            margin-top: 4px;
+            letter-spacing: 1px;
+        }
+        .form-row {
+            display: flex;
+            gap: 1rem;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+        button[type="submit"] {
+            width: 100%;
+            background: transparent;
+            border: 2px solid var(--border-color);
+            color: var(--fg-primary);
+            padding: 14px 24px;
+            font-size: 0.9rem;
+            font-family: var(--font-mono);
+            letter-spacing: 4px;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            margin-top: 1.5rem;
+            text-transform: uppercase;
+            border-radius: 0;
+        }
+        button[type="submit"]:hover {
+            background: var(--accent);
+            color: var(--accent-hover-text);
+            border-color: var(--accent);
+        }
+        .footer-note {
+            margin-top: 2rem;
+            font-size: 0.7rem;
+            color: var(--fg-muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .error-box {
+            background: rgba(255,70,70,0.1);
+            border: 1px solid #ff4444;
+            color: #ff4444;
+            padding: 10px;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+            border-radius: 0;
+            letter-spacing: 1px;
+        }
+        @media (max-width: 480px) {
+            .container { padding: 0 1.2rem; }
+            .title h1 { font-size: 1.6rem; }
+            .form-row { flex-direction: column; gap: 0; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 主题切换按钮（保持不变） -->
+    <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+        <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
+    </button>
+
+    <div class="container">
+        <div class="brand">
+            <span class="dash"></span>
+            <span style="letter-spacing:4px;">INIT</span>
+            <span class="dash"></span>
+        </div>
+        <div class="title">
+            <h1>SYH-CR</h1>
+            <span class="divider"></span>
+            <p>首次运行 · 系统配置</p>
+        </div>
+
+        {% if error %}
+        <div class="error-box">{{ error }}</div>
+        {% endif %}
+
+        <form action="/init" method="POST" autocomplete="off" id="initForm">
+            <!-- 数据库配置 -->
+            <div class="form-group">
+                <label for="db_ip">数据库 IP</label>
+                <input type="text" id="db_ip" name="db_ip" value="{{ db_ip or '127.0.0.1' }}" required>
+                <div class="hint">MongoDB 服务器地址</div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="db_port">端口</label>
+                    <input type="number" id="db_port" name="db_port" value="{{ db_port or '27017' }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="db_user">用户名 (可选)</label>
+                    <input type="text" id="db_user" name="db_user" value="{{ db_user or '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="db_pass">密码 (可选)</label>
+                    <input type="password" id="db_pass" name="db_pass" value="{{ db_pass or '' }}">
+                </div>
+            </div>
+
+            <!-- 服务器 IP（新增） -->
+            <div class="form-group" style="margin-top:1.5rem;">
+                <label for="server_ip">服务器地址 (IP 或域名)</label>
+                <input type="text" id="server_ip" name="server_ip" value="{{ server_ip or '' }}" placeholder="例如：192.168.1.100:5000" required>
+                <div class="hint">用于生成聊天室的跳转链接，<span style="color:var(--fg-secondary);">将自动识别当前访问地址</span></div>
+            </div>
+
+            <!-- 管理员账号 -->
+            <div class="form-group" style="margin-top:2.2rem;">
+                <label for="admin_user">管理员用户名</label>
+                <input type="text" id="admin_user" name="admin_user" value="{{ admin_user or 'admin' }}" required>
+                <div class="hint">将拥有管理权限（禁言、删消息、清空等）</div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="admin_pass">密码</label>
+                    <input type="password" id="admin_pass" name="admin_pass" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_pass_confirm">确认密码</label>
+                    <input type="password" id="admin_pass_confirm" name="admin_pass_confirm" required>
+                </div>
+            </div>
+
+            <!-- 邀请码数量 -->
+            <div class="form-group" style="margin-top:1.8rem;">
+                <label for="invite_count">初始邀请码数量</label>
+                <input type="number" id="invite_count" name="invite_count" value="5" min="1" max="20">
+                <div class="hint">系统将自动生成此数量的邀请码，用于新用户注册</div>
+            </div>
+
+            <button type="submit" id="submitBtn">初始化系统</button>
+        </form>
+
+        <div class="footer-note">
+            <span>配置将保存至 config.json</span>
+        </div>
+    </div>
+
+    <script>
+        // ===== 主题切换 =====
+        const toggle = document.getElementById('themeToggle');
+        const indicator = document.getElementById('modeIndicator');
+        function setTheme(isLight) {
+            if (isLight) {
+                document.body.classList.add('light-theme');
+                indicator.textContent = '亮';
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.body.classList.remove('light-theme');
+                indicator.textContent = '暗';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+        const saved = localStorage.getItem('theme');
+        setTheme(saved === 'light');
+        toggle.addEventListener('click', () => {
+            setTheme(!document.body.classList.contains('light-theme'));
+        });
+
+        // ===== 自动填充 server_ip（从浏览器地址栏获取） =====
+        (function autoFillServerIp() {
+            const serverIpInput = document.getElementById('server_ip');
+            // 如果已有值（比如从模板传入），则不再覆盖，方便用户保留手动输入
+            if (serverIpInput.value.trim() !== '') return;
+            // 获取当前主机名+端口（例如 "192.168.1.100:5000" 或 "example.com"）
+            const host = window.location.host; // 包含端口
+            if (host) {
+                serverIpInput.value = host;
+            }
+        })();
+
+        // ===== 提交前确认弹窗 =====
+        const form = document.getElementById('initForm');
+        form.addEventListener('submit', function(e) {
+            // 收集关键配置信息用于确认
+            const dbIp = document.getElementById('db_ip').value.trim();
+            const dbPort = document.getElementById('db_port').value.trim();
+            const serverIp = document.getElementById('server_ip').value.trim();
+            const adminUser = document.getElementById('admin_user').value.trim();
+            const inviteCount = document.getElementById('invite_count').value.trim();
+
+            const confirmMsg =
+                '请确认以下初始化配置：\n\n' +
+                '数据库地址：' + dbIp + ':' + dbPort + '\n' +
+                '服务器地址：' + (serverIp || '(未填写)') + '\n' +
+                '管理员账号：' + adminUser + '\n' +
+                '邀请码数量：' + inviteCount + '\n\n' +
+                '确认继续？';
+            if (!confirm(confirmMsg)) {
+                e.preventDefault(); // 取消提交
+            }
+            // 否则继续提交
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syh-Chatter · 初始化完成</title>
+    <link rel="shortcut icon" href="static/icon.png" type="image/x-icon">
+    <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #242424;
+            --fg-primary: #e0e0e0;
+            --fg-secondary: #999999;
+            --fg-muted: #666666;
+            --border-color: #3a3a3a;
+            --border-focus: #e0e0e0;
+            --accent: #ffffff;
+            --accent-hover-text: #1a1a1a;
+            --font-mono: 'Jetbrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+            --transition-speed: 0.2s;
+            --success-green: #4caf50;
+        }
+        body.light-theme {
+            --bg-primary: #fafafa;
+            --bg-secondary: #f0f0f0;
+            --fg-primary: #1a1a1a;
+            --fg-secondary: #555555;
+            --fg-muted: #999999;
+            --border-color: #cccccc;
+            --border-focus: #1a1a1a;
+            --accent: #1a1a1a;
+            --accent-hover-text: #ffffff;
+        }
+        @font-face {
+            font-family: 'Jetbrains Mono';
+            src: url('static/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: var(--bg-primary);
+            font-family: var(--font-mono);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--fg-primary);
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+            -webkit-font-smoothing: antialiased;
+        }
+        .theme-toggle {
+            position: fixed;
+            top: 24px;
+            right: 28px;
+            z-index: 100;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--fg-secondary);
+            padding: 10px 18px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            letter-spacing: 2px;
+            transition: all var(--transition-speed);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .theme-toggle:hover {
+            color: var(--fg-primary);
+            border-color: var(--fg-primary);
+        }
+        .theme-toggle .mode-text {
+            display: inline-block;
+            min-width: 2.5em;
+            text-align: center;
+            animation: textPulse 2s infinite;
+        }
+        @keyframes textPulse {
+            0%,100% { opacity:0.7; }
+            50% { opacity:1; }
+        }
+        .container {
+            width: 100%;
+            max-width: 560px;
+            padding: 0 2rem;
+            text-align: center;
+        }
+        .brand {
+            font-size: 0.75rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            height: 20px;
+        }
+        .brand .dash {
+            display: inline-block;
+            width: 20px;
+            height: 1px;
+            background: var(--border-color);
+        }
+        .title {
+            margin-bottom: 2rem;
+        }
+        .title h1 {
+            font-size: 2rem;
+            letter-spacing: 6px;
+            font-weight: 400;
+            color: var(--fg-primary);
+            text-transform: uppercase;
+        }
+        .title .divider {
+            display: block;
+            width: 40px;
+            height: 2px;
+            background: var(--border-color);
+            margin: 0.8rem auto 1rem;
+        }
+        .title p {
+            color: var(--fg-muted);
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .success-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            display: block;
+            color: var(--success-green);
+        }
+        .info-line {
+            font-size: 0.85rem;
+            color: var(--fg-secondary);
+            letter-spacing: 1px;
+            margin-bottom: 1.8rem;
+        }
+        .info-line strong {
+            color: var(--fg-primary);
+        }
+
+        /* 邀请码区域 */
+        .codes-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 1.5rem 1.2rem;
+            margin: 1.5rem 0;
+            text-align: left;
+        }
+        .codes-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--fg-secondary);
+        }
+        .copy-all-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--fg-secondary);
+            padding: 4px 14px;
+            font-size: 0.65rem;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            letter-spacing: 1px;
+            border-radius: 0;
+        }
+        .copy-all-btn:hover {
+            color: var(--fg-primary);
+            border-color: var(--fg-primary);
+        }
+        .code-list {
+            list-style: none;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .code-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-primary);
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            border-left: 2px solid var(--border-focus);
+            transition: background var(--transition-speed);
+        }
+        .code-item .code-text {
+            font-weight: 500;
+            color: var(--fg-primary);
+        }
+        .copy-single-btn {
+            background: transparent;
+            border: none;
+            color: var(--fg-muted);
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            transition: color var(--transition-speed);
+            font-family: var(--font-mono);
+        }
+        .copy-single-btn:hover {
+            color: var(--fg-primary);
+        }
+        .copy-single-btn.copied {
+            color: var(--success-green);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-focus);
+            color: var(--fg-primary);
+            padding: 10px 24px;
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 999;
+        }
+        .toast.show {
+            opacity: 1;
+        }
+
+        .btn-login {
+            display: inline-block;
+            background: transparent;
+            border: 2px solid var(--border-color);
+            color: var(--fg-primary);
+            padding: 12px 40px;
+            font-size: 0.85rem;
+            font-family: var(--font-mono);
+            letter-spacing: 4px;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            text-transform: uppercase;
+            text-decoration: none;
+            margin-top: 1rem;
+            border-radius: 0;
+        }
+        .btn-login:hover {
+            background: var(--accent);
+            color: var(--accent-hover-text);
+            border-color: var(--accent);
+        }
+
+        .footer-note {
+            margin-top: 2.5rem;
+            font-size: 0.7rem;
+            color: var(--fg-muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        @media (max-width: 480px) {
+            .container { padding: 0 1.2rem; }
+            .code-list { grid-template-columns: 1fr; }
+            .title h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+        <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
+    </button>
+
+    <div class="container">
+        <div class="brand">
+            <span class="dash"></span>
+            <span style="letter-spacing:4px;">DONE</span>
+            <span class="dash"></span>
+        </div>
+
+        <div class="title">
+            <span class="success-icon">✓</span>
+            <h1>SYH-CR</h1>
+            <span class="divider"></span>
+            <p>初始化已完成</p>
+        </div>
+
+        <div class="info-line">
+            管理员 <strong>{{ admin_user }}</strong> &nbsp;·&nbsp; 数据库 <strong>{{ db_ip }}</strong> &nbsp;·&nbsp; 服务器 <strong>{{ server_ip }}</strong>
+        </div>
+
+        <div class="codes-section">
+            <div class="codes-header">
+                <span>📋 系统邀请码（用于注册新用户）</span>
+                <button class="copy-all-btn" id="copyAllBtn">复制全部</button>
+            </div>
+            <ul class="code-list" id="codeList">
+                {% for code in invite_codes %}
+                <li class="code-item">
+                    <span class="code-text">{{ code }}</span>
+                    <button class="copy-single-btn" data-code="{{ code }}">复制</button>
+                </li>
+                {% endfor %}
+            </ul>
+            {% if invite_codes|length == 0 %}
+            <p style="color: var(--fg-muted); font-size: 0.8rem; text-align:center; padding: 10px 0;">
+                未生成邀请码，请检查 invite_code.txt 文件。
+            </p>
+            {% endif %}
+        </div>
+
+        <a href="/" class="btn-login">前往登录</a>
+
+        <div class="footer-note">
+            <span>请妥善保管邀请码</span>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ===== 主题切换 =====
+        const toggle = document.getElementById('themeToggle');
+        const indicator = document.getElementById('modeIndicator');
+        function setTheme(isLight) {
+            if (isLight) {
+                document.body.classList.add('light-theme');
+                indicator.textContent = '亮';
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.body.classList.remove('light-theme');
+                indicator.textContent = '暗';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+        const saved = localStorage.getItem('theme');
+        setTheme(saved === 'light');
+        toggle.addEventListener('click', () => {
+            setTheme(!document.body.classList.contains('light-theme'));
+        });
+
+        // ===== Toast =====
+        const toast = document.getElementById('toast');
+        let toastTimer = null;
+
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // ===== 复制单个 =====
+        document.querySelectorAll('.copy-single-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const code = this.getAttribute('data-code');
+                navigator.clipboard.writeText(code).then(() => {
+                    this.textContent = '已复制';
+                    this.classList.add('copied');
+                    setTimeout(() => {
+                        this.textContent = '复制';
+                        this.classList.remove('copied');
+                    }, 1500);
+                    showToast('已复制: ' + code);
+                }).catch(() => {
+                    // 降级方案
+                    const range = document.createRange();
+                    const textNode = this.parentElement.querySelector('.code-text');
+                    range.selectNode(textNode);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                    document.execCommand('copy');
+                    window.getSelection().removeAllRanges();
+                    this.textContent = '已复制';
+                    setTimeout(() => {
+                        this.textContent = '复制';
+                    }, 1500);
+                    showToast('已复制: ' + code);
+                });
+            });
+        });
+
+        // ===== 复制全部 =====
+        document.getElementById('copyAllBtn').addEventListener('click', function() {
+            const codes = [];
+            document.querySelectorAll('.code-text').forEach(el => {
+                codes.push(el.textContent.trim());
+            });
+            const allText = codes.join('\n');
+            if (!allText) {
+                showToast('没有可复制的邀请码');
+                return;
+            }
+            navigator.clipboard.writeText(allText).then(() => {
+                showToast('已复制全部 ' + codes.length + ' 个邀请码');
+                this.textContent = '✓ 已复制';
+                setTimeout(() => {
+                    this.textContent = '复制全部';
+                }, 1500);
+            }).catch(() => {
+                // 降级
+                const textarea = document.createElement('textarea');
+                textarea.value = allText;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('已复制全部 ' + codes.length + ' 个邀请码');
+                this.textContent = '✓ 已复制';
+                setTimeout(() => {
+                    this.textContent = '复制全部';
+                }, 1500);
+            });
+        });
+    </script>
+</body>
+</html>
