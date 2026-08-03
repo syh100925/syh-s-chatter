@@ -196,8 +196,8 @@ def ensure_not_muted(username):
 
 
 def infer_message_type(content, stored_type=None, user=None):
-    if stored_type:
-        return str(stored_type)
+    content = '' if content is None else str(content)
+    # Content markers repair legacy records that were stored with type="text".
     if user == 'system' or content == 'clear':
         return 'system'
     if content.startswith('::img::'):
@@ -208,6 +208,8 @@ def infer_message_type(content, stored_type=None, user=None):
         return 'emoji'
     if content.startswith('::file::'):
         return 'file'
+    if stored_type:
+        return str(stored_type)
     return 'text'
 
 
@@ -661,8 +663,9 @@ def chat_new():
     value = str(value)
     if not value:
         return json_error('消息不能为空', 400)
+    message_type = 'emoji' if value.startswith('::emoji::') else 'text'
     try:
-        message = add_chat(username, value, get_current_time(), reply_to=payload.get('reply_to'), message_type='text')
+        message = add_chat(username, value, get_current_time(), reply_to=payload.get('reply_to'), message_type=message_type)
     except MuteError as exc:
         return json_error('您已被禁言', 403, muted_until=exc.muted_until)
     return jsonify({'ok': True, 'update': request_token(), 'message': message})
