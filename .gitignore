@@ -1,8 +1,67 @@
+# ========== IDE / 编辑器 ==========
 .idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ========== Python 缓存 ==========
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ========== 日志文件 ==========
 log.txt
+*.log
+
+# ========== 运行时状态文件（会话、临时数据） ==========
 login_users.txt
 login_passes.txt
+
+# ========== 应用核心数据文件（用户、密码、颜色、邀请码） ==========
+usernames.list
+passwords.list
+colors.list
+invite_code.txt
+
+# ========== 配置文件（包含数据库连接等敏感信息） ==========
+config.json
+.env
+*.env
+
+# ========== 用户上传文件目录 ==========
 static/uploads/
 static/emoji/
+
+# ========== 本地数据库文件（若使用 SQLite 等） ==========
+*.db
+*.sqlite
+*.sqlite3
+
+# ========== 虚拟环境 ==========
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ========== 操作系统元数据 ==========
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ========== 测试 / 临时文件 ==========
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+*.cover
+*.orig
+*.rej
