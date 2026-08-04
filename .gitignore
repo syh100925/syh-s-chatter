@@ -65,3 +65,10 @@ dmypy.json
 *.cover
 *.orig
 *.rej
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/node_modules/.tmp/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts

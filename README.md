@@ -241,6 +241,60 @@ A：这说明应用未能连接到 MongoDB，而是使用了内存存储。请�
 
 ---
 
+## 🧭 Modern IM 客户端
+
+项目现在同时提供旧版兼容入口和现代客户端：
+
+- `/chatts`、`/chattss`、`/chatts-new`、`/chatts_file` 继续服务 LiLan 和 OlivOSAIChatAssassin；旧消息字段、Emoji 路径和附件 URL 保持兼容。
+- `/app` 是 React + TypeScript + Vite 构建的现代网页客户端，支持公共聊天室、私聊、Markdown、Reaction、SSE 实时更新、附件上传、纯文本文件预览/语法高亮、消息编辑/撤回和多主题。
+- `/api/v2` 提供新客户端和机器人使用的 JSON/SSE API，包含资料、屏蔽、会话置顶/免打扰/归档、搜索、回复、转发、收藏、消息置顶、举报、通知和管理接口。机器人 token 在网页的“机器人 Token”设置中创建，每个用户只保留一个有效 token。
+- 大文件可使用 `/api/v2/uploads/init`、`/chunks/<index>`、`/complete` 分片上传；普通附件优先使用 GridFS，旧磁盘附件仍按原文件名读取。
+- 机器人使用 `Authorization: Bearer <token>` 访问 `/api/v2/bot/messages`、`/bot/events` 和 `/bot/streams`。流式消息按 `start -> delta -> complete/cancel` 生命周期提交，正文支持 Markdown 和换行。
+
+前端构建需要 Node.js：
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+生产环境仍只需要运行 Flask/Python；构建结果位于 `frontend/dist`。SSE 部署时需要使用支持长连接的 WSGI 服务，并关闭反向代理缓冲。
+
+### 历史数据检查
+
+迁移前运行只读扫描：
+
+```bash
+python migration_scan.py --json
+```
+
+扫描发现缺失图片、音频、文件、Emoji、未知字段或异常消息时会返回非零状态码，应该先处理报告再迁移。扫描不会修改 MongoDB 或文件。
+
+普通新附件使用 GridFS；旧 `static/uploads` 文件和 `static/emoji/<用户名>` 目录保持可读。ZIP 只做目录结构预览，文本预览会返回多个编码候选，并在无法识别时回退到 UTF-8。
+
+### 历史数据迁移 smoke test
+
+如果旧版服务器的 MongoDB 和文件目录在另一台机器上，请先将旧版项目根目录（至少包含 `static/uploads`、`static/emoji`、`usernames.list`、`passwords.list`、`colors.list`）复制到可访问的位置，并确保当前机器能连接旧 MongoDB。然后双击：
+
+```text
+smoke_test_migration.bat
+```
+
+脚本会询问旧版项目根目录和 MongoDB URI。也可以直接运行：
+
+```bash
+python migration_smoke_test.py --source C:\old-chat --mongo-uri mongodb://user:password@host:27017/chats
+```
+
+它会只读检查消息转换投影、旧 `chat`/`content` 字段、稳定消息 ID、回复引用、图片/音频/普通文件、旧版 Emoji、用户列表、v2 文件元数据和磁盘文件是否存在。错误会让进程返回非零状态码；警告会列出未知字段和未被消息引用的孤立文件，但不会直接阻断。工具不会修改 MongoDB 或源文件，完整报告可用 `--json` 或 `--report report.json` 输出。修改测试器本身后可运行：
+
+```bash
+python migration_smoke_test.py --self-test
+```
+
+---
+
 ## 📄 许可证
 
 本项目仅供学习交流使用，请勿用于非法用途。
