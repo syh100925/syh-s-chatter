@@ -1,0 +1,67 @@
+name: Build Self-Extracting Release
+
+on:
+  push:
+    tags:
+      - 'v*'                 # 推送 v 开头标签时触发
+  workflow_dispatch:         # 允许手动触发
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        default: 'v0.0.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # 允许创建 Release 和上传资产
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 安装 makeself（Ubuntu 官方源提供）
+      - name: Install makeself
+        run: sudo apt-get update && sudo apt-get install -y makeself
+
+      # 准备打包目录，并根据 .gitignore 排除文件（如果 .gitignore 不存在则使用默认排除）
+      - name: Prepare packaging directory
+        run: |
+          mkdir package
+          # 使用 rsync 复制当前目录所有文件到 package/，同时排除 .gitignore 中的模式
+          # 注意：rsync 的 --exclude-from 需要 .gitignore 文件中每行一个模式
+          # 同时明确排除 .git 和 .github 目录（即使 .gitignore 未列全）
+          rsync -av --exclude-from=.gitignore --exclude=.git --exclude=.github ./ package/
+          # 给 server.py 添加执行权限（可选，使启动更直接）
+          chmod +x package/server.py
+
+      # 使用 makeself 生成自解压归档
+      - name: Create self-extracting archive
+        run: |
+          # 格式：makeself [选项] <源目录> <输出文件> <标签> <启动命令>
+          # --gzip 压缩，--notemp 不解压到临时目录（直接解压到当前目录）
+          makeself --gzip --notemp \
+            package \
+            syh-s-chatter.run \
+            "Syh-S-Chatter Server" \
+            ./server.py
+          # 确保生成的 .run 文件可执行
+          chmod +x syh-s-chatter.run
+
+      # （可选）上传 .run 文件作为工作流产物，便于调试
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: syh-s-chatter-run
+          path: syh-s-chatter.run
+
+      # 创建 Release 并上传资产
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: syh-s-chatter.run
+          generate_release_notes: true
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
