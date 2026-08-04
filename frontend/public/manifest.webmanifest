@@ -1,0 +1,9 @@
+{
+  "name": "hzx chat",
+  "short_name": "hzx chat",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#15191f",
+  "theme_color": "#15191f",
+  "icons": []
+}
