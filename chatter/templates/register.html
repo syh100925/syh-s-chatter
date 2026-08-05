@@ -319,6 +319,7 @@
     </style>
 </head>
 <body>
+    {% include '_icons.html' %}
     <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
         <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
     </button>
@@ -341,11 +342,11 @@
 
         {% if error %}
             <div style="color: #ff6b6b; font-size: 0.85rem; margin-bottom: 1.5rem; letter-spacing: 1px; border: 1px solid #ff6b6b; padding: 10px; background: rgba(255, 107, 107, 0.08);">
-                ⚠️ {{ error }}
+                <svg class="icon" aria-hidden="true" style="vertical-align:-2px;"><use href="#i-alert"/></svg> {{ error }}
             </div>
         {% endif %}
 
-        <form action="/register" method="POST" autocomplete="off">
+        <form action="{{ base_path }}/register" method="POST" autocomplete="off">
             <div class="form-control">
                 <input type="text" required name="username" id="username" placeholder=" " autocomplete="off">
                 <label for="username">Username</label>
@@ -369,7 +370,7 @@
 
         <div class="footer-note" style="margin-top: 2rem;">
             <span>已有账号？</span>
-            <a href="/sec" style="color: var(--fg-muted); text-decoration: none; border-bottom: 1px solid var(--border-color); padding-bottom: 2px;">
+            <a href="{{ base_path }}/sec" style="color: var(--fg-muted); text-decoration: none; border-bottom: 1px solid var(--border-color); padding-bottom: 2px;">
                 返回登录
             </a>
         </div>

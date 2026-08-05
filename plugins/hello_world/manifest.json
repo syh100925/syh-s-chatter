@@ -1,0 +1,7 @@
+{
+  "name": "hello_world",
+  "version": "1.0.0",
+  "author": "syh",
+  "description": "示例插件：新增 /plugins/hello_world/about 页面、command: hello 命令、注入外观 CSS 与工具集链接。",
+  "entry": "main.py"
+}

@@ -1,7 +1,7 @@
 # syh's chatter
 
-一个基于 **Flask** 和 **MongoDB** 的轻量级聊天室应用，支持多用户实时交流、文件上传、管理员控制、邀请码注册等功能。  
-**新特性**：首次启动时提供 **Web 初始化向导**，无需手动编辑配置文件或数据文件，一切通过界面完成。
+一个基于 **Flask** 和 **MongoDB** 的轻量级聊天室应用，支持多用户实时交流、文件上传、邀请码注册、权限组、管理员控制面板、插件系统与主题切换动画。
+**新特性**：可作为一个可嵌入的 Python 包（`chatter`）挂载到任意 Flask 应用中；首次启动提供 **Web 初始化向导**，一切通过界面完成。
 
 ![preview](preview.png)
 
@@ -9,248 +9,249 @@
 
 ## ✨ 功能特性
 
-- 💬 **实时消息**：通过轮询刷新，实现近实时聊天体验
-- 🧩 **结构化消息**：JSON 消息 ID、回复引用、软撤回、系统公告与服务端禁言状态
+- 💬 **实时消息**：轮询刷新，近实时聊天体验
+- 🧩 **结构化消息**：JSON 消息 ID、回复引用、软撤回、系统公告与服务端禁言
 - 👤 **用户系统**：自定义昵称与颜色，密码使用 `werkzeug` 哈希存储
-- 📎 **文件上传**：自动识别图片、音频、普通文件，并添加标记（`::img::`、`::wav::`、`::file::`）
-- 👑 **管理员命令**：
-  - `command: clear` – 清空所有聊天记录
-  - `command: delete N` – 删除最后 N 条消息
-  - `command: change_color 用户名 新颜色` – 修改指定用户的显示颜色（影响后续消息）
-- 🔐 **安全注册**：需要邀请码方可注册，初始邀请码在首次初始化时自动生成并展示
+- 🛡 **权限组**：细粒度权限点（消息、命令、管理、插件），可自定义权限组（见下文）
+- ⚙️ **管理面板**：聊天室弹窗 + 独立页面，管理用户 / 权限组 / 插件 / 流量 / 数据库 / 设置
+- 🔌 **插件系统**：文件夹式与单文件式插件，支持命令、钩子、页面、CSS/JS 注入
+- 📎 **文件上传**：自动识别图片、音频、普通文件（`::img::`、`::wav::`、`::file::` 标记）
+- 🗺 **挂载路径（base_path）**：聊天室可挂载到任意子路径（如 `/chat`），也可嵌入宿主 Flask 应用
+- 👑 **管理员命令**：`command: clear` / `command: delete N` / `command: change_color 用户 颜色`
+- 🔐 **安全注册**：邀请码注册，初始邀请码在初始化时自动生成
 - 👥 **在线列表**：动态显示当前在线用户
-- 💾 **MongoDB 持久化**：所有消息存入数据库，重启后数据不丢失（若 MongoDB 不可用，自动降级为内存存储）
-- 🎨 **前端友好**：集成 Font Awesome、Highlight.js、jQuery、html2canvas（通过 CDN 引入）
+- 💾 **MongoDB 持久化**：消息与流量统计入库（MongoDB 不可用时自动降级为 mongomock 内存存储）
+- 🎬 **动画**：黑白主题切换的圆圈扩散动画（clip-path 从按钮中心扩散）、页面错峰出场动画
 
 ---
 
 ## 📦 环境要求
 
-- Python 3.6 及以上
-- MongoDB 服务器（本地或远程；生产环境建议启动以持久化消息）
-- pip（Python 包管理器）
+- Python 3.6+
+- MongoDB（生产环境建议启动以持久化消息；无 MongoDB 时自动使用内存回退）
+- pip
 
 ---
 
 ## 🚀 安装与配置
 
-### 1. 克隆项目
+### 1. 克隆与安装依赖
 
 ```bash
 git clone https://github.com/syh100925/syh-s-chatter.git
 cd syh-s-chatter
-```
-
-### 2. 安装 Python 依赖
-
-```bash
 pip install -r requirements.txt
 ```
 
-> `werkzeug` 提供了密码哈希与安全文件名处理；`charset-normalizer` 仅用于 `.cpp` 文件的在线预览和复制，原始下载仍保持字节不变。若本机暂时没有 MongoDB，服务会使用 `mongomock` 内存回退，重启后消息不会保留。
+> `werkzeug` 提供密码哈希；`charset-normalizer` 用于 `.cpp` 文件在线预览；无 MongoDB 时使用 `mongomock` 内存回退（重启后消息丢失）。
 
-### 3. 首次运行（自动初始化）
-
-**重要**：从本版本开始，您**不再需要**手动创建 `usernames.list`、`passwords.list`、`colors.list` 或 `invite_code.txt`。  
-所有配置和初始数据均可通过 **Web 初始化向导** 完成。
-
-#### 3.1 启动服务
+### 2. 启动与初始化
 
 ```bash
 python server.py
 ```
 
-默认监听 `0.0.0.0:5000`。如果您希望更改 IP 或端口，可直接修改 `server.py` 末尾的 `app.run` 参数。
+访问 `http://<服务器IP>:5000`，自动跳转 `/init` 初始化向导，填写：
 
-#### 3.2 访问初始化页面
+- **MongoDB 连接信息**（IP、端口、用户名、密码，可测试连接）
+- **服务器地址**（生成跳转链接用，如 `192.168.1.100:5000`）
+- **挂载路径**（可选，如 `/chat`，决定聊天室访问前缀）
+- **管理员账号** 与 **初始邀请码数量**
 
-打开浏览器访问 `http://<服务器IP>:5000`（若在本机运行，可使用 `127.0.0.1`）。  
-首次访问时，系统会自动跳转到 `/init` 初始化页面。
-
-#### 3.3 填写配置信息
-
-在初始化页面中，您需要填写：
-
-- **MongoDB 连接信息**：数据库 IP、端口、用户名（可选）、密码（可选）  
-- **服务器地址**：用于生成聊天室的跳转链接（例如 `192.168.1.100:5000`）。页面会自动从浏览器地址栏识别当前主机，您也可以手动修改。
-- **管理员账号**：用户名和密码（系统将创建此用户，并赋予管理员权限）
-- **初始邀请码数量**：系统将生成指定数量的邀请码，供新用户注册使用
-
-#### 3.4 测试数据库连接（可选）
-
-在填写数据库信息后，点击 **“测试连接”** 按钮，系统会尝试连接 MongoDB 并返回结果。即使连接失败，您仍可以继续提交（此时将使用内存存储，重启后数据丢失）。
-
-#### 3.5 提交初始化
-
-点击 **“初始化系统”** 按钮，系统将：
-
-- 保存数据库配置（`config.json`）
-- 创建管理员用户（写入 `usernames.list` 等文件）
-- 生成指定数量的邀请码（写入 `invite_code.txt`）
-- 初始化数据库集合（自动创建 `chats.values` 和 `chats.mutes`）
-
-#### 3.6 获取邀请码
-
-初始化完成后，页面会显示所有生成的邀请码，**请妥善保存**。  
-每个邀请码只能使用一次，用于新用户注册。
-
-#### 3.7 开始使用
-
-点击页面上的 **“前往登录”** 按钮，使用管理员账号登录聊天室。
+初始化完成后页面展示邀请码，凭邀请码注册新用户。
 
 ---
 
-### 手动配置（高级用户）
+## 🧱 架构（v2 模块化）
 
-如果您希望绕过初始化向导（例如在无头环境中部署），仍可手动创建所需文件：
+代码组织为可嵌入的 `chatter` 包：
 
-- `usernames.list` – 每行一个用户名（**必须包含管理员账户**，初始管理员默认为 `admin`）
-- `passwords.list` – 每行一个密码哈希（使用 `werkzeug.security.generate_password_hash` 生成）
-- `colors.list` – 每行一个 CSS 颜色值（如 `red`、`#ff0000`）
-- `invite_code.txt` – 每行一个邀请码
-
-同时，在 `server.py` 中直接设置 `database_ip`、`database_port` 等变量（不推荐，因为初始化界面更易用）。
-
----
-
-## ▶️ 启动服务
-
-### 前台运行（调试）
-
-```bash
-python server.py
+```
+chatter/
+├── __init__.py          # create_app() / register_into() 工厂
+├── blueprints/          # init_routes / auth_routes / chat_routes / admin_page / admin_api
+├── templates/           # chat.html（瘦模板）、admin.html、admin_content.html ...
+├── config.py            # config.json 读写与默认设置
+├── permissions.py       # 权限组、权限点、展开与检查
+├── plugin_manager.py    # 插件发现/加载/钩子/注入
+├── traffic.py           # 流量统计（MongoDB traffic 集合）
+└── ...                  # auth / users / messages / attachments / commands / database / state
+static/
+├── css/chat.css         # 聊天室样式（已从模板抽出）
+└── js/chat.js           # 聊天室脚本（已从模板抽出）
+plugins/                 # 插件目录（文件夹式 + 单文件式）
+tests/smoke_test.py      # 14 项冒烟测试
 ```
 
-默认监听 `0.0.0.0:5000`，访问 `http://<server_ip>:5000` 即可。
-
-### 后台运行（Linux / nohup）
-
-项目提供了脚本：
-
-```bash
-# 启动（后台运行）
-./start.sh
-
-# 停止（会输出 PID，需手动 kill）
-./stop.sh
-```
-
----
-
-## 🛠️ 管理员命令
-
-登录管理员账户后，在聊天输入框中发送以下格式的命令：
-
-- `command: clear` – 清空所有消息
-- `command: delete 10` – 删除最后 10 条消息
-- `command: change_color 张三 #00ff00` – 将用户“张三”的颜色改为绿色
-
-命令执行成功或失败都会有日志记录（`log.txt`）。
-
----
-
-## 🎨 自定义与进阶
-
-### 前端样式
-
-- `templates/login.html` – 登录页面样式
-- `templates/chat.html` – 聊天主界面样式
-
-可直接编辑 `<style>` 标签内的 CSS。
-
-### 刷新与超时时间
-
-在 `templates/chat.html` 中：
-
-```javascript
-setInterval(update, 1 * 1000);          // 消息轮询间隔（毫秒）
-setInterval(login, 5 * 60 * 1000);      // 自动登出检查间隔（毫秒）
-```
-
-### 文件上传限制
-
-可在 `server.py` 中添加配置：
+### 独立运行
 
 ```python
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制为 16MB
+# server.py 实际内容即如此
+from chatter import create_app
+app = create_app()          # 支持 create_app(base_path='/chat', data_dir='./data')
 ```
 
-### 前端库
+### 嵌入宿主 Flask 应用
 
-项目通过 CDN 引入了以下库（无需本地放置）：
-- Font Awesome 5
-- Highlight.js
-- jQuery
-- html2canvas
+```python
+from flask import Flask
+from chatter import register_into
 
-如需离线使用，可将文件放入 `static/` 并修改模板中的引用路径。
+app = Flask(__name__)
+register_into(app, base_path='/chat', data_dir='./data')
+```
+
+`register_into` 会注册全部蓝图、`before_request` 初始化检查（未初始化自动跳 `/init`）、流量记录、模板上下文（`base_path`、`site_title`、插件注入等）并加载插件。
+若宿主与聊天室结构差异较大，也可用 `werkzeug` DispatcherMiddleware 挂载整个应用：
+
+```python
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from chatter import create_app
+
+chat_app = create_app()
+app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {'/chat': chat_app})
+```
+
+注意：挂载路径改变（`base_path`）后需重启服务生效。
 
 ---
 
-## 📁 文件上传说明
+## 🛡 权限组
 
-- 上传的文件保存在 `static/uploads/` 目录。
-- 文件名自动去重（若重名则添加 `(1)`、`(2)` 等后缀）。
-- 根据扩展名自动添加前缀：
-  - 图片（`.jpg`、`.png`、`.jpeg`、`.bmp`）→ `::img::`
-  - 音频（`.mp3`、`.wav`、`.flac`）→ `::wav::`
-  - 其他文件 → `::file::`
-- 前端会根据前缀渲染不同的样式（如图片预览、音频播放器）。
+权限点以 `域.动作` 命名，支持通配符：
+
+| 权限点 | 说明 |
+| --- | --- |
+| `message.send` / `message.recall.any` | 发消息 / 撤回任意消息 |
+| `chat.clear` / `chat.delete` / `chat.change_color` | 清屏 / 删消息 / 改颜色 |
+| `moderation.mute` / `moderation.unmute` | 禁言 / 解除禁言 |
+| `admin.panel` / `admin.users` / `admin.groups` / `admin.plugins` | 管理面板各板块 |
+| `admin.traffic` / `admin.database` / `admin.settings` | 流量 / 数据库 / 设置 |
+| `admin.tools` | 快捷工具链接管理 |
+| `plugins.<插件>.<动作>` | 插件自定义权限点 |
+
+- 权限组定义在 `config.json` 的 `permission_groups`（组名 → 权限列表），默认三组：
+  `admin`（`*`）、`moderator`（消息 + 删消息 + 禁言）、`user`（发消息）
+- `user_groups` 保存 用户 → 组 映射，`default_group` 为默认组
+- `admins` 列表中的用户自动拥有全部权限
+- 在 **管理面板 → 权限组** 中可视化编辑，实时生效
+
+---
+
+## 🔌 插件系统
+
+插件目录 `plugins/`，支持两种格式，加载后提供聊天命令、钩子、页面、CSS/JS 注入。
+完整 API 说明见 **[Plugin.md](Plugin.md)**（PluginContext 全部方法、钩子事件表、命令签名、权限点约定与示例讲解）。
+
+### 文件夹式
+
+```
+plugins/my_plugin/
+├── manifest.json     # {"name": "my_plugin", "version": "0.1.0", "author": "…", "entry": "main.py"}
+├── main.py           # 入口，定义 on_load(ctx)
+└── config.json       # 插件配置（可选，管理面板可编辑）
+```
+
+### 单文件式
+
+```python
+# plugins/echo.py（项目自带示例）
+PLUGIN_INFO = {'name': 'echo', 'version': '0.1.0', 'author': 'syh'}
+
+def on_load(ctx):
+    def cmd_echo(username, parts, d_time, command_str):
+        from chatter import messages
+        return messages.add_system_message('[echo] ' + command_str[len('command: echo'):].strip())
+    ctx.add_command('echo', cmd_echo, permission='plugins.echo.echo')
+```
+
+### PluginContext 能力
+
+| 方法 | 用途 |
+| --- | --- |
+| `ctx.add_command(name, fn, permission, description)` | 注册聊天命令（`command: 名称 …`） |
+| `ctx.on(event, handler)` | 钩子：`message_send`、`chat_data`、`login`、`logout`、`register`、`message_recall` |
+| `ctx.register_blueprint(bp, url_prefix)` | 注册页面/API 蓝图 |
+| `ctx.add_css(...)` / `ctx.add_js(...)` | 注入 CSS / JS（原始代码或插件内文件路径） |
+| `ctx.add_tool_link(title, url)` | 加入聊天室“工具集”弹窗 |
+| `ctx.get_config(key, default)` / `ctx.set_config(key, value)` | 读写插件 `config.json` |
+
+插件可访问 `chatter` 包内任意模块（`messages`、`permissions`、`state` 等）。启用/禁用可在管理面板即时切换；注册蓝图类变更需重启服务。
+
+---
+
+## ⚙️ 管理面板
+
+拥有 `admin.panel` 权限的用户点击聊天室右下角 **🛡** 按钮打开管理弹窗（独立访问 `http://<host>/admin?update=<token>`），包含：
+
+- **用户**：改颜色、改权限组、改名、重置密码、删除、批量生成邀请码
+- **权限组**：增删组、勾选权限点、设置默认组
+- **插件**：启停、重载、编辑 JSON 配置
+- **流量**：总请求数、今日请求、独立 IP、近 7 天柱状图、热门路径
+- **数据库**：消息统计、dbstats、按用户查消息、删除用户消息、清空记录
+- **设置**：站点标题、服务器地址、端口、轮询间隔、默认禁言时长、挂载路径、管理员列表
+- **快捷工具**：编辑聊天室"工具集"弹窗中的自定义链接（与插件提供的链接一同展示）
+
+---
+
+## 👑 聊天命令
+
+管理员/有权限用户在输入框发送：
+
+- `command: clear` – 清空聊天记录
+- `command: delete 10` – 删除最后 10 条消息
+- `command: change_color 张三 #00ff00` – 修改用户颜色
+- 插件注册的命令（如 `command: hello 张三`、`command: echo 你好`）
+
+---
+
+## 🎨 主题与动画
+
+- 点击右上角 **主题** 按钮：黑白主题通过从按钮中心扩散的 `clip-path` 圆平滑切换（约 500ms）；系统开启“减少动态效果”时直接切换
+- 页面元素错峰出场动画；所有动画尊重 `prefers-reduced-motion`
+- 样式：`static/css/chat.css`；脚本：`static/js/chat.js`；管理面板：`static/js/admin.js`
 
 ---
 
 ## 🗄️ 数据库结构
 
 - 数据库：`chats`
-- 集合：`values`（存储消息）和 `mutes`（存储禁言记录）
-- 消息文档字段：
-  - `id` – 消息唯一标识（UUID）
-  - `user` – 发送者
-  - `content` – 消息内容（包含标记）
-  - `color` – 用户颜色
-  - `time` – 显示时间（格式：`年:月:日:时:分`）
-  - `created_at` – 创建时间戳（用于撤回时间限制）
-  - `type` – 消息类型（`text`、`image`、`audio`、`file`、`emoji`、`system`）
-  - `recalled` – 是否已撤回
-  - `reply_to` – 回复的消息 ID（可选）
+- 集合：`values`（消息）、`mutes`（禁言）、`traffic`（流量，需管理面板查看）
+- 消息文档字段：`id`（UUID）、`user`、`content`（含类型标记）、`color`、`time`、`created_at`、`type`（text/image/audio/file/emoji/system）、`recalled`、`reply_to`
+
+---
+
+## 🧪 测试
+
+```bash
+python tests\smoke_test.py     # 冒烟测试（初始化、注册、登录、发消息、撤回、命令、禁言、权限）
+```
+
+---
+
+## 📁 文件说明
+
+- 数据文件（`config.json`、`usernames.list`、`passwords.list`、`colors.list`、`invite_code.txt`、`log.txt`）位于项目根目录，可经 `create_app(data_dir=...)` 迁移
+- 上传文件保存在 `static/uploads/`，表情包在 `static/emoji/`
 
 ---
 
 ## ❓ 常见问题
 
-**Q：首次访问时没有自动跳转到初始化页面？**  
-A：请检查是否已存在 `config.json` 或 `usernames.list` 文件（若存在，系统会认为已初始化）。删除这些文件后重新访问即可。
-
-**Q：初始化时提示“所有必填字段不能为空”？**  
-A：请确保填写了数据库 IP、端口、管理员用户名和密码。
-
-**Q：登录时提示“认证数据错误”？**  
-A：检查初始化时创建的管理员密码是否输入正确，或确认 `usernames.list` 和 `passwords.list` 内容未被篡改。
-
-**Q：注册时提示“无效的邀请码”？**  
-A：确保使用的是初始化完成后页面显示的邀请码，注意大小写和空格。每个邀请码只能使用一次。
-
-**Q：上传文件后消息未显示？**  
-A：检查 `static/uploads/` 目录是否存在且可写，同时确认文件大小未超过 Flask 限制。
-
-**Q：页面跳转链接无效（如 `http:///...`）？**  
-A：请正确设置 `server_ip` 变量（位于 `server.py` 顶部），或使用初始化界面中的“服务器地址”字段配置。
+**Q：没有自动跳转初始化页面？**  
+A：删除 `config.json` 与 `usernames.list` 后重新访问。
 
 **Q：聊天记录重启后丢失？**  
-A：这说明应用未能连接到 MongoDB，而是使用了内存存储。请检查 MongoDB 服务是否运行，以及 `config.json` 中的连接信息是否正确。您可以在初始化页面使用“测试连接”功能进行诊断。
+A：未连接上 MongoDB，使用了内存回退。检查 MongoDB 与 `config.json` 连接信息。
+
+**Q：挂载路径修改后不生效？**  
+A：`base_path` 在启动时注册路由，修改后需重启服务。
+
+**Q：插件蓝图在“重载”后未更新？**  
+A：Flask 在首次请求后不允许注册新蓝图，此类变更需重启服务；命令与钩子即时生效。
 
 ---
 
 ## 📄 许可证
 
 本项目仅供学习交流使用，请勿用于非法用途。
-
----
-
-## 🤝 贡献
-
-欢迎提交 Issue 或 Pull Request 改进本项目。
-
----
-
-> 若仍有疑问，请查看 `log.txt` 日志文件获取更多调试信息。

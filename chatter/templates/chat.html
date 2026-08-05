@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ site_title }}</title>
+    <link rel="shortcut icon" href="{{ base_path }}/static/icon.png" type="image/x-icon" />
+    <link id="highlight-theme" rel="stylesheet" href="{{ base_path }}/static/js/highlight.js/styles/atom-one-dark.min.css" />
+    <link rel="stylesheet" href="{{ base_path }}/static/css/chat.css" />
+    <!-- html2canvas 用于截图 -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    {{ plugin_css|safe }}
+</head>
+<body id="body">
+    {% include '_icons.html' %}
+    <div class="background" style="display:none;"></div>
+
+    <!-- 主题切换 -->
+    <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+        <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
+    </button>
+
+    <!-- 外观 & 工具按钮 -->
+    <div class="appearance-btn" id="appearanceBtn" title="外观设置"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></div>
+    <div class="tools-btn" id="toolsBtn" title="工具集"><svg class="icon" aria-hidden="true"><use href="#i-tool"/></svg></div>
+    {% if 'admin.panel' in permissions %}
+    <div class="admin-entry-btn" id="adminEntryBtn" title="管理面板"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></div>
+    {% endif %}
+
+    <!-- 工具弹窗 -->
+    <div class="tools-modal" id="toolsModal">
+        <div class="tools-card">
+            <h3>快捷工具</h3>
+            <div class="tools-list">
+                {% for title, url in tool_links %}
+                <a href="{{ url }}" target="_blank" class="tools-link">{{ title }}</a>
+                {% endfor %}
+            </div>
+            <button class="tools-close" id="toolsCloseBtn">关闭</button>
+        </div>
+    </div>
+
+    <!-- 复制提示 -->
+    <div class="copy-toast" id="copyToast">复制成功</div>
+
+    <!-- 会话失效弹窗 -->
+    <div class="alert-modal" id="sessionAlert">
+        <div class="alert-card">
+            <div class="alert-icon-text">!</div>
+            <h2>登录已失效</h2>
+            <p>您的登录凭证已过期，请重新登录。</p>
+            <button class="modal-btn" id="alertConfirmBtn">确认</button>
+        </div>
+    </div>
+
+    <div class="action-dialog" id="actionDialog" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="action-dialog-card">
+            <h3 id="actionDialogTitle">确认操作</h3>
+            <p id="actionDialogMessage"></p>
+            <div class="action-dialog-actions">
+                <button type="button" id="actionDialogCancel">取消</button>
+                <button type="button" class="primary" id="actionDialogConfirm">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="message-menu" id="messageMenu" role="menu">
+        <button type="button" data-action="reply"><svg class="icon" aria-hidden="true"><use href="#i-corner-up-left"/></svg> 回复</button>
+        <button type="button" data-action="copy"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg> 复制</button>
+        <button type="button" data-action="recall"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> 撤回</button>
+    </div>
+    <div class="avatar-menu" id="avatarMenu" role="menu">
+        <button type="button" data-action="mute" id="avatarMuteBtn"><svg class="icon" aria-hidden="true"><use href="#i-volume-x"/></svg> 禁言</button>
+        <button type="button" data-action="unmute" id="avatarUnmuteBtn"><svg class="icon" aria-hidden="true"><use href="#i-volume-2"/></svg> 解除禁言</button>
+    </div>
+
+    <!-- ========== 主聊天区域 ========== -->
+    <p class="boot-line"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg> {{ site_title }} boot complete <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg></p>
+
+    <div id="chat" class="page-enter">
+        <div class="chat-header"><p>{{ site_title }}</p></div>
+        <div class="chat-divider"></div>
+        <div style="padding-left:8px;padding-right:8px;">
+            <p class="system-message">[聊天室]: <span>IP checked ......</span></p>
+        </div>
+
+        <!-- 消息列表 -->
+        <div id="sd"><ul id="message-list"></ul></div>
+
+        <!-- ===== 分享工具栏 ===== -->
+        <div id="share-toolbar">
+            <button class="share-btn" id="selectModeBtn"><svg class="icon" aria-hidden="true"><use href="#i-check-square"/></svg> 选择消息</button>
+            <button class="share-btn" id="generateShareBtn" disabled><svg class="icon" aria-hidden="true"><use href="#i-image"/></svg> 生成分享图片</button>
+            <span class="share-divider">|</span>
+            <span class="share-count" id="selectedCount">已选: 0 条</span>
+            <button class="share-btn" id="cancelSelectBtn" style="display:none;"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg> 取消选择</button>
+        </div>
+
+        <!-- 用户信息 -->
+        <div class="user-info">
+            <p class="user-name"><span class="user-avatar-inline">{{ username[0].upper() }}</span>{{ username }}</p>
+            <div class="online-status"><span class="online-dot"></span><span class="online-label">在线</span><div class="user-tags" id="userTags"></div></div>
+        </div>
+
+        <!-- 管理员面板 -->
+        {% if 'admin.panel' in permissions %}
+        <div class="admin-panel"><p>快捷命令</p><div class="command-buttons">
+            {% if 'chat.clear' in permissions %}<button class="cmd-btn" data-cmd="clear">clear</button>{% endif %}
+            {% if 'chat.change_color' in permissions %}<button class="cmd-btn" data-cmd="change_color [用户名] [颜色]">change_color</button><button class="cmd-btn" data-cmd="change_color 梨岚 #ff0000">梨岚红色</button><button class="cmd-btn" data-cmd="change_color 梨岚 #00ff00">梨岚绿色</button>{% endif %}
+            {% if 'chat.delete' in permissions %}<button class="cmd-btn" data-cmd="delete [数量]">delete</button><button class="cmd-btn" data-cmd="delete 1">delete 1</button><button class="cmd-btn" data-cmd="delete 5">delete 5</button>{% endif %}
+        </div></div>
+        {% endif %}
+
+        <!-- 输入区域 -->
+        <div id="chat-combined">
+            <div class="mute-status" id="muteStatus" aria-live="polite"></div>
+            <div class="reply-compose" id="replyCompose">
+                <svg class="icon" aria-hidden="true"><use href="#i-corner-up-left"/></svg>
+                <span class="reply-compose-text" id="replyComposeText"></span>
+                <button type="button" id="cancelReplyBtn" aria-label="取消回复"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="input-row">
+                <div class="text-field">
+                    <input type="text" name="upload_value" id="upft" placeholder="输入文字...">
+                    <div class="warning-hint" id="warningHint" style="display:none;"></div>
+                    <div class="autocomplete-menu"></div>
+                </div>
+                <div class="file-field">
+                    <button type="button" class="file-picker-button" id="filePickerBtn" title="选择文件" aria-label="选择文件">
+                        <img src="{{ base_path }}/static/upload.png" alt="">
+                    </button>
+                    <input type="file" name="file" id="file-input" hidden>
+                </div>
+                <div class="send-btn">
+                    <button type="button" id="sendBtn">发送</button>
+                    <button type="button" class="text-file-send-btn" id="textFileSendBtn" title="发送文本文件"><svg class="icon" aria-hidden="true"><use href="#i-file-text"/></svg></button>
+                    <button type="button" class="emoji-input-btn" id="emojiInputBtn" title="表情包"><svg class="icon" aria-hidden="true"><use href="#i-smile"/></svg></button>
+                </div>
+            </div>
+            <div class="filename-hint" id="fileHint"></div>
+        </div>
+    </div>
+
+    <!-- 管理面板内容（按需加载，见 chat.js） -->
+    <div id="adminWindowHost" hidden></div>
+
+    <!-- ========== 页面配置 ========== -->
+    <script>
+        window.CHAT_CONFIG = {
+            username: {{ username|tojson }},
+            update: {{ update|tojson }},
+            is_admin: {{ is_admin|tojson }},
+            permissions: {{ permissions|tojson }},
+            mute_until: {{ mute_until|tojson }},
+            base_path: {{ base_path|tojson }},
+            poll_interval: {{ poll_interval|tojson }}
+        };
+    </script>
+
+    <!-- ========== JS 依赖 ========== -->
+    <script src="{{ base_path }}/static/js/highlight.js/highlight.min.js"></script>
+    <script type="text/javascript" src="{{ base_path }}/static/js/jquery/jquery.min.js"></script>
+    <script type="text/javascript" src="{{ base_path }}/static/js/jquery/jquery.form.js"></script>
+    {{ plugin_js|safe }}
+    <script src="{{ base_path }}/static/js/chat.js"></script>
+</body>
+</html>

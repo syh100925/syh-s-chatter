@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ site_title }} · 管理面板</title>
+    <link rel="shortcut icon" href="{{ base_path }}/static/icon.png" type="image/x-icon" />
+    <link rel="stylesheet" href="{{ base_path }}/static/css/chat.css" />
+    {{ plugin_css|safe }}
+</head>
+<body id="body" class="admin-standalone-page">
+    {% include '_icons.html' %}
+    <div class="admin-standalone">
+        <header class="admin-standalone-header">
+            <span class="admin-standalone-title"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> {{ site_title }} 管理面板</span>
+            <span class="admin-standalone-user">{{ username }}</span>
+            <a class="admin-back-link" href="{{ base_path }}/"><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"/></svg> 返回聊天室</a>
+        </header>
+        <div class="admin-standalone-body">
+            {% include 'admin_content.html' %}
+        </div>
+    </div>
+
+    <script>
+        window.CHAT_CONFIG = {
+            username: {{ username|tojson }},
+            update: {{ update|tojson }},
+            is_admin: {{ is_admin|tojson }},
+            permissions: {{ permissions|tojson }},
+            mute_until: 0,
+            base_path: {{ base_path|tojson }},
+            poll_interval: {{ poll_interval|tojson }},
+            standalone: true
+        };
+    </script>
+    {{ plugin_js|safe }}
+    <script src="{{ base_path }}/static/js/admin.js"></script>
+</body>
+</html>

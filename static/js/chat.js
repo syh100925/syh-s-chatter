@@ -1,1856 +1,16 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>syh's chatter</title>
-    <link rel="shortcut icon" href="static/icon.png" type="image/x-icon" />
-    <link id="highlight-theme" rel="stylesheet" href="static/js/highlight.js/styles/atom-one-dark.min.css" />
-    <!-- html2canvas 用于截图 -->
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js">
-    </script>
-    <style>
-        /* ===== 原有样式（保留） ===== */
-        :root {
-            --bg-primary: #1a1a1a;
-            --bg-secondary: #242424;
-            --fg-primary: #e0e0e0;
-            --fg-secondary: #999999;
-            --fg-muted: #666666;
-            --border-color: #3a3a3a;
-            --accent: #ffffff;
-            --accent-hover-text: #1a1a1a;
-            --own-bg: #2a2a2a;
-            --own-text: #e0e0e0;
-            --other-bg: #1f1f1f;
-            --other-text: #e0e0e0;
-            --bubble-border: #3a3a3a;
-            --avatar-bg: #2e2e2e;
-            --system-text: #ff6b6b;
-            --system-border: #ff6b6b;
-            --online-dot-color: #4caf50;
-            --link-color: #6ea8fe;
-            --mention-color: #ffaa00;
-            --mention-bg: rgba(255, 170, 0, 0.15);
-            --font-mono: 'Jetbrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
-            --transition-speed: 0.15s;
-            --error-color: #ff6b6b;
-            --window-bg: #1a1a1a;
-            --window-border: #3a3a3a;
-            --window-titlebar-bg: #242424;
-            --window-titlebar-text: #e0e0e0;
-            --window-content-bg: #1f1f1f;
-            --l-color: #666666;
-            --base-font-size: 16px;
-            --bubble-radius: 0px;
-            --message-font-size: 0.9rem;
-            --avatar-size: 36px;
-            --avatar-border-width: 2px;
-            --online-dot-size: 8px;
-            --scrollbar-track: transparent;
-            --scrollbar-thumb: #444444;
-            --scrollbar-thumb-hover: #555555;
-            /* 分享预览专用 */
-            --preview-bg: #1a1a1a;
-            --preview-text: #e0e0e0;
-            --upload-icon-filter: invert(1);
-            --upload-icon-hover-filter: invert(0);
-        }
-        body.light-theme {
-            --bg-primary: #fafafa;
-            --bg-secondary: #f0f0f0;
-            --fg-primary: #1a1a1a;
-            --fg-secondary: #555555;
-            --fg-muted: #999999;
-            --border-color: #cccccc;
-            --accent: #1a1a1a;
-            --accent-hover-text: #ffffff;
-            --own-bg: #e8e8e8;
-            --own-text: #1a1a1a;
-            --other-bg: #f5f5f5;
-            --other-text: #1a1a1a;
-            --bubble-border: #cccccc;
-            --avatar-bg: #d0d0d0;
-            --system-text: #d32f2f;
-            --system-border: #d32f2f;
-            --online-dot-color: #2e7d32;
-            --link-color: #0d6efd;
-            --mention-color: #cc7a00;
-            --mention-bg: rgba(204, 122, 0, 0.15);
-            --window-bg: #fafafa;
-            --window-border: #cccccc;
-            --window-titlebar-bg: #f0f0f0;
-            --window-titlebar-text: #1a1a1a;
-            --window-content-bg: #f5f5f5;
-            --l-color: #aaaaaa;
-            --scrollbar-track: transparent;
-            --scrollbar-thumb: #cccccc;
-            --scrollbar-thumb-hover: #aaaaaa;
-            --preview-bg: #fafafa;
-            --preview-text: #1a1a1a;
-            --upload-icon-filter: none;
-            --upload-icon-hover-filter: invert(1);
-        }
-        @font-face {
-            font-family: 'Jetbrains Mono';
-            src: url('static/fonts/JetBrainsMono-Medium.woff2') format('woff2');
-            font-weight: normal;
-            font-style: normal;
-            font-display: swap;
-        }
-        html {
-            font-size: var(--base-font-size);
-        }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            background-color: var(--bg-primary);
-            font-family: var(--font-mono);
-            font-size: 1rem;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            transition: background-color var(--transition-speed), color var(--transition-speed);
-            color: var(--fg-primary);
-            cursor: url('/static/cur-default.png'), auto;
-        }
-        .theme-toggle {
-            position: fixed;
-            top: 24px;
-            right: 28px;
-            z-index: 9999;
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-secondary);
-            padding: 10px 18px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            font-family: var(--font-mono);
-            letter-spacing: 2px;
-            transition: all var(--transition-speed);
-            text-transform: uppercase;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .theme-toggle:hover {
-            color: var(--fg-primary);
-            border-color: var(--fg-primary);
-        }
-        .theme-toggle .mode-text {
-            display: inline-block;
-            min-width: 2.5em;
-            text-align: center;
-            animation: textPulse 2s infinite;
-        }
-        @keyframes textPulse {
-            0%,
-            100% {
-                opacity: 0.7;
-            }
-            50% {
-                opacity: 1;
-            }
-        }
-        .appearance-btn,
-        .tools-btn {
-            position: fixed;
-            bottom: 30px;
-            z-index: 9998;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            color: var(--fg-primary);
-            font-size: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            transition: all var(--transition-speed);
-        }
-        .appearance-btn {
-            right: 30px;
-        }
-        .tools-btn {
-            right: 90px;
-        }
-        .appearance-btn:hover,
-        .tools-btn:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        #chat {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            max-width: 1000px;
-            background: transparent;
-            border: 1px solid var(--border-color);
-            padding: 24px 20px;
-        }
-        .chat-header p {
-            font-size: 1.8rem !important;
-            letter-spacing: 4px;
-            color: var(--fg-primary) !important;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            font-weight: 400;
-        }
-        .chat-divider {
-            border-top: 1px solid var(--border-color) !important;
-            margin: 12px 0;
-        }
-        .system-message {
-            color: var(--system-text) !important;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 8px 16px;
-            border-left: 3px solid var(--system-border);
-            margin: 8px 0 16px 0 !important;
-            font-size: 0.9rem;
-            letter-spacing: 1px;
-        }
-        .system-message span {
-            color: var(--fg-secondary) !important;
-            animation: fadeText 2s infinite;
-        }
-        @keyframes fadeText {
-            0%,
-            100% {
-                opacity: 0.7;
-            }
-            50% {
-                opacity: 1;
-            }
-        }
-        #sd {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            padding: 12px 16px !important;
-            height: 45vh;
-            overflow-y: auto;
-            scroll-behavior: smooth;
-        }
-        #sd::-webkit-scrollbar {
-            width: 6px;
-        }
-        #sd::-webkit-scrollbar-track {
-            background: var(--scrollbar-track);
-        }
-        #sd::-webkit-scrollbar-thumb {
-            background: var(--scrollbar-thumb);
-            border-radius: 3px;
-        }
-        #sd::-webkit-scrollbar-thumb:hover {
-            background: var(--scrollbar-thumb-hover);
-        }
-        .time-separator {
-            list-style: none;
-            text-align: center;
-            margin: 20px 0;
-            color: var(--fg-muted);
-            font-size: 0.75rem;
-        }
-        .time-separator span {
-            background: var(--bg-primary);
-            padding: 6px 18px;
-            border: 1px solid var(--border-color);
-            display: inline-block;
-        }
-        #sd ul {
-            list-style: none;
-        }
-        #sd li:not(.time-separator) {
-            margin-bottom: 16px;
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-        }
-        #sd li.own-message {
-            flex-direction: row-reverse;
-        }
-        .msg-avatar {
-            width: var(--avatar-size);
-            height: var(--avatar-size);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: calc(var(--avatar-size) * 0.45);
-            font-weight: 500;
-            text-transform: uppercase;
-            flex-shrink: 0;
-            background-color: var(--avatar-bg);
-            color: var(--fg-primary);
-            border: var(--avatar-border-width) solid;
-        }
-        .message-content {
-            max-width: 70%;
-            display: flex;
-            flex-direction: column;
-        }
-        .message-sender {
-            font-size: 0.75rem;
-            color: var(--fg-muted);
-            margin-bottom: 4px;
-            margin-left: 4px;
-            letter-spacing: 1px;
-        }
-        .own-message .message-sender {
-            display: none;
-        }
-        .message-bubble {
-            padding: 10px 14px;
-            border: 1px solid var(--bubble-border);
-            background-color: var(--other-bg);
-            color: var(--other-text);
-            word-wrap: break-word;
-            line-height: 1.5;
-            font-size: var(--message-font-size);
-            border-radius: var(--bubble-radius);
-        }
-        .message-row {
-            position: relative;
-        }
-        .message-bubble.recalled-bubble {
-            color: var(--fg-muted);
-            font-style: italic;
-            border-style: dashed;
-        }
-        .message-time {
-            color: var(--fg-muted);
-            font-size: 0.68rem;
-            margin-top: 4px;
-            padding: 0 4px;
-        }
-        .own-message .message-time {
-            text-align: right;
-        }
-        .reply-reference {
-            display: block;
-            width: 100%;
-            max-width: 100%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            color: var(--fg-muted);
-            background: var(--bg-secondary);
-            border-left: 2px solid var(--border-color);
-            padding: 3px 7px;
-            margin-top: 6px;
-            text-align: left;
-            font: inherit;
-            font-size: 0.72rem;
-            cursor: pointer;
-        }
-        .reply-reference:hover {
-            color: var(--fg-primary);
-            border-left-color: var(--fg-primary);
-        }
-        .message-highlight {
-            animation: messageHighlight 1.8s ease;
-        }
-        @keyframes messageHighlight {
-            0%, 100% { outline: 1px solid transparent; }
-            20%, 70% { outline: 1px solid var(--fg-primary); outline-offset: 4px; }
-        }
-        .message-bubble .remote-image-link {
-            display: block;
-            max-width: 320px;
-        }
-        .message-bubble .remote-image-link img {
-            display: block;
-            max-width: 320px;
-            max-height: 320px;
-            width: auto;
-            height: auto;
-            object-fit: contain;
-            border: 1px solid var(--bubble-border);
-        }
-        .rich-link {
-            color: var(--link-color);
-            text-decoration: none;
-            overflow-wrap: anywhere;
-        }
-        .rich-link:hover {
-            text-decoration: underline;
-        }
-        .system-row {
-            display: block !important;
-            margin: 8px 0 16px !important;
-        }
-        .system-row .system-message-item {
-            color: var(--system-text);
-            background: rgba(255, 255, 255, 0.05);
-            padding: 8px 16px;
-            border-left: 3px solid var(--system-border);
-            font-size: 0.84rem;
-            line-height: 1.5;
-            word-break: break-word;
-        }
-        .own-message .message-bubble {
-            background-color: var(--own-bg);
-            color: var(--own-text);
-        }
-        .message-bubble a:not(.file-link):not(.image-preview-link):not(.preview-link) {
-            color: var(--link-color);
-            text-decoration: none;
-            transition: opacity 0.2s;
-        }
-        .message-bubble a:not(.file-link):not(.image-preview-link):not(.preview-link):hover {
-            opacity: 0.8;
-        }
-        .message-bubble .mention {
-            color: var(--mention-color);
-            background: var(--mention-bg);
-            padding: 0 2px;
-            border-radius: 2px;
-            font-weight: 500;
-        }
-        .message-bubble.single-attachment {
-            border: none;
-            padding: 0;
-            background: transparent;
-        }
-        .message-bubble.single-attachment>a,
-        .message-bubble.single-attachment>.image-preview-link,
-        .message-bubble.single-attachment>audio,
-        .message-bubble.single-attachment>img {
-            display: block;
-            width: 100%;
-            padding: 10px 14px;
-            border: 1px solid var(--bubble-border);
-            background-color: var(--other-bg);
-            color: var(--other-text);
-            text-decoration: none;
-            font-size: var(--message-font-size);
-            border-radius: var(--bubble-radius);
-            max-width: 100%;
-            height: auto;
-        }
-        .own-message .message-bubble.single-attachment>a,
-        .own-message .message-bubble.single-attachment>.image-preview-link,
-        .own-message .message-bubble.single-attachment>audio,
-        .own-message .message-bubble.single-attachment>img {
-            background-color: var(--own-bg);
-            color: var(--own-text);
-        }
-        .message-bubble.single-attachment>a:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .message-bubble.single-attachment .image-preview-link img {
-            max-width: 100%;
-            display: block;
-            border: none;
-        }
-        .message-bubble.single-attachment>audio {
-            width: 100%;
-            border-radius: 0;
-            padding: 0;
-        }
-        .message-bubble img.emoji-inline,
-        .single-attachment img.emoji-inline {
-            max-width: 150px;
-            max-height: 150px;
-            width: auto;
-            height: auto;
-            object-fit: contain;
-            display: inline-block;
-            margin: 2px 0;
-        }
-        .user-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 16px 0 12px;
-            padding: 8px 12px;
-            background: transparent;
-            border: none;
-        }
-        .user-name {
-            font-size: 0.95rem;
-            font-weight: 500;
-            color: var(--fg-primary);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .online-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 4px 14px;
-            border: none;
-            font-size: 0.85rem;
-            color: var(--fg-primary);
-            max-width: 70%;
-        }
-        .online-dot {
-            display: inline-block;
-            width: var(--online-dot-size);
-            height: var(--online-dot-size);
-            background-color: var(--online-dot-color);
-            border-radius: 50%;
-        }
-        .online-label {
-            color: var(--fg-muted);
-            margin-right: 2px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .user-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            align-items: center;
-        }
-        .user-tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: transparent;
-            color: var(--fg-primary);
-            padding: 4px 10px;
-            border: 1px solid var(--border-color);
-            font-size: 0.75rem;
-        }
-        .user-tag.self {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-            border-color: var(--fg-primary);
-            font-weight: 500;
-        }
-        .tag-avatar {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: var(--avatar-bg);
-            color: var(--fg-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: bold;
-            text-transform: uppercase;
-            border: 1px solid;
-        }
-        .tag-name {
-            max-width: 80px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .alone-message {
-            color: var(--fg-muted);
-            font-style: italic;
-            padding: 4px 8px;
-            font-size: 0.8rem;
-        }
-        .admin-panel {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            padding: 16px 18px;
-            margin-bottom: 16px;
-        }
-        .admin-panel p {
-            color: var(--fg-muted);
-            font-size: 0.85rem;
-            margin-bottom: 10px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-        .command-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .cmd-btn {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-primary);
-            padding: 6px 14px;
-            font-size: 0.8rem;
-            font-family: var(--font-mono);
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: background var(--transition-speed);
-        }
-        .cmd-btn:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        #chat-combined {
-            background: transparent;
-            border: none;
-            padding: 20px 0;
-            margin-top: 16px;
-        }
-        .input-row {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .text-field {
-            flex: 2 1 250px;
-            position: relative;
-        }
-        .text-field input {
-            width: 100%;
-            background: transparent;
-            border: 1px solid var(--border-color);
-            padding: 12px 18px;
-            font-size: 0.9rem;
-            color: var(--fg-primary);
-            font-family: var(--font-mono);
-            outline: none;
-        }
-        .text-field input:focus {
-            border-color: var(--fg-primary);
-        }
-        .file-field {
-            flex: 1 1 200px;
-        }
-        .file-field input {
-            width: 100%;
-            background: transparent;
-            border: 1px dashed var(--border-color);
-            padding: 10px 12px;
-            color: var(--fg-muted);
-            font-family: var(--font-mono);
-            cursor: pointer;
-        }
-        .file-field input::file-selector-button {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            padding: 6px 14px;
-            color: var(--fg-primary);
-            margin-right: 12px;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: background var(--transition-speed);
-        }
-        .file-field input::file-selector-button:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .send-btn {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .send-btn button {
-            background: transparent;
-            border: 2px solid var(--border-color);
-            color: var(--fg-primary);
-            padding: 10px 24px;
-            font-size: 0.9rem;
-            font-family: var(--font-mono);
-            letter-spacing: 2px;
-            cursor: pointer;
-            text-transform: uppercase;
-            transition: all var(--transition-speed);
-        }
-        .send-btn button:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .text-file-send-btn,
-        .emoji-input-btn {
-            background: transparent;
-            border: 2px solid var(--border-color);
-            color: var(--fg-primary);
-            padding: 10px 14px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all var(--transition-speed);
-        }
-        .text-file-send-btn:hover,
-        .emoji-input-btn:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .filename-hint {
-            margin-top: 10px;
-            font-size: 0.8rem;
-            color: var(--fg-muted);
-            padding-left: 8px;
-        }
-        .warning-hint {
-            margin-top: 5px;
-            font-size: 0.8rem;
-            color: var(--error-color);
-            padding-left: 8px;
-            display: none;
-        }
-        .mute-status {
-            display: none;
-            margin: 0 0 12px;
-            padding: 8px 12px;
-            border: 1px solid var(--error-color);
-            color: var(--error-color);
-            font-size: 0.8rem;
-            line-height: 1.4;
-        }
-        .mute-status.active {
-            display: block;
-        }
-        .reply-compose {
-            display: none;
-            align-items: center;
-            gap: 8px;
-            margin: 0 0 8px;
-            padding: 7px 10px;
-            border: 1px solid var(--border-color);
-            color: var(--fg-secondary);
-            font-size: 0.76rem;
-            min-width: 0;
-        }
-        .reply-compose.active {
-            display: flex;
-        }
-        .reply-compose .reply-compose-text {
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            flex: 1;
-            min-width: 0;
-        }
-        .reply-compose button,
-        .message-menu button,
-        .avatar-menu button,
-        .action-dialog button {
-            font: inherit;
-        }
-        .reply-compose button {
-            background: transparent;
-            border: 0;
-            color: var(--fg-muted);
-            cursor: pointer;
-            padding: 2px 5px;
-        }
-        .reply-compose button:hover {
-            color: var(--fg-primary);
-        }
-        .file-picker-button {
-            width: 44px;
-            height: 44px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--border-color);
-            background: transparent;
-            color: var(--fg-primary);
-            cursor: pointer;
-            transition: all var(--transition-speed);
-            flex-shrink: 0;
-        }
-        .file-picker-button:hover {
-            background: var(--fg-primary);
-            border-color: var(--fg-primary);
-        }
-        .file-picker-button img {
-            width: 24px;
-            height: 24px;
-            object-fit: contain;
-            filter: var(--upload-icon-filter, none);
-        }
-        .file-picker-button:hover img {
-            filter: var(--upload-icon-hover-filter, invert(1));
-        }
-        .message-menu,
-        .avatar-menu {
-            position: fixed;
-            z-index: 10000;
-            display: none;
-            min-width: 150px;
-            max-width: min(220px, calc(100vw - 16px));
-            background: var(--window-bg);
-            border: 1px solid var(--border-color);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-            padding: 4px;
-        }
-        .message-menu.active,
-        .avatar-menu.active {
-            display: block;
-        }
-        .message-menu button,
-        .avatar-menu button {
-            width: 100%;
-            display: block;
-            text-align: left;
-            border: 0;
-            background: transparent;
-            color: var(--fg-primary);
-            padding: 9px 11px;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-        .message-menu button:hover,
-        .avatar-menu button:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .action-dialog {
-            position: fixed;
-            inset: 0;
-            z-index: 11000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.68);
-            padding: 20px;
-        }
-        .action-dialog.active {
-            display: flex;
-        }
-        .action-dialog-card {
-            width: min(380px, 100%);
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            padding: 22px;
-        }
-        .action-dialog-card h3 {
-            color: var(--fg-primary);
-            font-size: 1rem;
-            font-weight: 400;
-            margin-bottom: 10px;
-        }
-        .action-dialog-card p {
-            color: var(--fg-secondary);
-            font-size: 0.83rem;
-            line-height: 1.6;
-            margin-bottom: 18px;
-            overflow-wrap: anywhere;
-        }
-        .action-dialog-actions {
-            display: flex;
-            gap: 8px;
-            justify-content: flex-end;
-        }
-        .action-dialog button {
-            border: 1px solid var(--border-color);
-            background: transparent;
-            color: var(--fg-primary);
-            padding: 7px 14px;
-            cursor: pointer;
-        }
-        .action-dialog button:hover,
-        .action-dialog button.primary {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .clear-message {
-            text-align: center;
-            color: var(--fg-muted);
-            padding: 10px;
-            font-style: italic;
-        }
+// syh's chatter 前端主脚本（从 chat.html 抽取）
+// 页面配置通过 window.CHAT_CONFIG 注入，见模板 <script>window.CHAT_CONFIG = ...</script>
+const BASE_PATH = (window.CHAT_CONFIG && window.CHAT_CONFIG.base_path) || '';
+const POLL_INTERVAL = (window.CHAT_CONFIG && window.CHAT_CONFIG.poll_interval) || 3000;
 
-        /* ===== @补全菜单 ===== */
-        .autocomplete-menu {
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            width: 100%;
-            max-height: 160px;
-            overflow-y: auto;
-            background: var(--window-bg);
-            border: 1px solid var(--border-color);
-            z-index: 999;
-            display: none;
-            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
-        }
-        .autocomplete-menu::-webkit-scrollbar {
-            width: 6px;
-        }
-        .autocomplete-menu::-webkit-scrollbar-track {
-            background: var(--scrollbar-track);
-        }
-        .autocomplete-menu::-webkit-scrollbar-thumb {
-            background: var(--scrollbar-thumb);
-            border-radius: 3px;
-        }
-        .autocomplete-menu::-webkit-scrollbar-thumb:hover {
-            background: var(--scrollbar-thumb-hover);
-        }
-        .autocomplete-menu.active {
-            display: block;
-        }
-        .autocomplete-item {
-            padding: 8px 14px;
-            font-size: 0.9rem;
-            color: var(--fg-primary);
-            cursor: pointer;
-            transition: background var(--transition-speed);
-        }
-        .autocomplete-item:hover,
-        .autocomplete-item.selected {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
+function u(path) { return BASE_PATH + path; }
 
-        /* ===== 可拖拽窗口 ===== */
-        .draggable-window {
-            position: fixed;
-            z-index: 3000;
-            min-width: 350px;
-            max-width: 90vw;
-            background: var(--window-bg);
-            border: 1px solid var(--window-border);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-            display: flex;
-            flex-direction: column;
-            opacity: 0;
-            transition: opacity 0.25s ease;
-        }
-        .window-titlebar {
-            background: var(--window-titlebar-bg);
-            padding: 8px 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: move;
-            user-select: none;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .window-title {
-            color: var(--window-titlebar-text);
-            font-size: 0.85rem;
-            letter-spacing: 1px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            max-width: 60%;
-        }
-        .window-actions {
-            display: flex;
-            gap: 6px;
-        }
-        .window-btn {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-secondary);
-            padding: 2px 8px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all var(--transition-speed);
-            font-family: var(--font-mono);
-        }
-        .window-btn:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .window-progress {
-            padding: 10px 12px;
-            background: var(--window-titlebar-bg);
-            border-bottom: 1px solid var(--border-color);
-        }
-        .window-progress .progress-bar {
-            height: 4px;
-            background: var(--border-color);
-            margin-bottom: 4px;
-        }
-        .window-progress .progress-fill {
-            height: 100%;
-            width: 0%;
-            background: var(--fg-primary);
-            transition: width 0.2s;
-        }
-        .window-progress .progress-text {
-            font-size: 0.75rem;
-            color: var(--fg-muted);
-        }
-        .window-content {
-            overflow: auto;
-            max-height: 55vh;
-            padding: 16px;
-            background: var(--window-content-bg);
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            color: var(--fg-primary);
-            position: relative;
-            cursor: default;
-        }
-        .window-content::-webkit-scrollbar {
-            width: 6px;
-        }
-        .window-content::-webkit-scrollbar-track {
-            background: var(--scrollbar-track);
-        }
-        .window-content::-webkit-scrollbar-thumb {
-            background: var(--scrollbar-thumb);
-            border-radius: 3px;
-        }
-        .window-content::-webkit-scrollbar-thumb:hover {
-            background: var(--scrollbar-thumb-hover);
-        }
-        .window-content pre {
-            margin: 0;
-            background: transparent;
-        }
-        .window-content code {
-            font-family: var(--font-mono);
-        }
-        .content-copy-btn {
-            position: absolute;
-            top: 10px;
-            right: 14px;
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-muted);
-            padding: 4px 10px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all var(--transition-speed);
-            display: none;
-        }
-        .content-copy-btn:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        @keyframes windowHighlight {
-            0% {
-                border-color: var(--fg-primary);
-                box-shadow: 0 0 20px var(--fg-primary);
-            }
-            100% {
-                border-color: var(--window-border);
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-            }
-        }
-        .draggable-window.highlight {
-            animation: windowHighlight 0.6s ease;
-        }
-        .l-corner {
-            position: fixed;
-            width: 20px;
-            height: 20px;
-            border: 4px solid var(--l-color);
-            pointer-events: none;
-            opacity: 1;
-            transition: left 0.3s ease, top 0.3s ease, opacity 0.25s ease;
-        }
-        .l-corner.top-right {
-            border-left: none;
-            border-bottom: none;
-        }
-        .l-corner.bottom-left {
-            border-right: none;
-            border-top: none;
-        }
-        .window-outline {
-            position: fixed;
-            border: 2px dashed var(--l-color);
-            pointer-events: none;
-            opacity: 1;
-            transition: all 0.3s ease, opacity 0.25s ease;
-        }
-        @keyframes scrollCode {
-            0% {
-                transform: translateY(0);
-            }
-            100% {
-                transform: translateY(-50%);
-            }
-        }
-        .code-scroller {
-            height: 200px;
-            overflow: hidden;
-            margin-top: 20px;
-            border: 1px solid var(--border-color);
-            position: relative;
-        }
-        .code-scroll-inner {
-            animation: scrollCode 25s linear infinite;
-            font-size: 0.8rem;
-            white-space: pre;
-            padding: 10px;
-            color: var(--fg-muted);
-        }
-        .settings-menu-container {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            flex-wrap: wrap;
-            padding: 20px 0;
-        }
-        .settings-menu-btn {
-            position: relative;
-            width: 120px;
-            height: 200px;
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-primary);
-            font-family: var(--font-mono);
-            font-size: 0.9rem;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            transform: skewX(-8deg);
-            transition: background 0.3s, color 0.3s, border-color 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        .settings-menu-btn span {
-            transform: skewX(8deg);
-            position: relative;
-            z-index: 1;
-        }
-        .settings-menu-btn:hover {
-            color: var(--bg-primary);
-            border-color: var(--stripe-color, var(--fg-primary));
-        }
-        .settings-menu-btn::after {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(135deg, transparent 40%, var(--stripe-color, var(--fg-primary)) 45%, var(--stripe-color, var(--fg-primary)) 55%, transparent 60%);
-            opacity: 0;
-            transition: opacity 0.3s;
-            transform: skewX(8deg);
-        }
-        .settings-menu-btn:hover::after {
-            opacity: 1;
-        }
-        .settings-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            color: var(--fg-primary);
-            width: 100%;
-        }
-        .settings-row label {
-            font-size: 0.8rem;
-            flex: 1;
-        }
-        .settings-row input[type="range"] {
-            width: 100px;
-        }
-        .settings-row select,
-        .settings-row input[type="checkbox"] {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-primary);
-            padding: 2px 6px;
-            font-family: var(--font-mono);
-            cursor: pointer;
-        }
-        .back-btn {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-secondary);
-            padding: 4px 12px;
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            cursor: pointer;
-            letter-spacing: 1px;
-            margin-bottom: 16px;
-            transition: background 0.2s, color 0.2s;
-            align-self: flex-start;
-        }
-        .back-btn:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .tools-modal {
-            position: fixed;
-            z-index: 6000;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-            transition: background 0.3s ease;
-        }
-        .tools-modal.active {
-            background: rgba(0, 0, 0, 0.8);
-            pointer-events: auto;
-        }
-        .tools-card {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            padding: 32px 40px;
-            max-width: 400px;
-            width: 90%;
-            text-align: center;
-            transform: scale(0.8);
-            opacity: 0;
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        .tools-modal.active .tools-card {
-            transform: scale(1);
-            opacity: 1;
-        }
-        .tools-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--fg-primary), transparent);
-            animation: scanLine 2s linear infinite;
-        }
-        @keyframes scanLine {
-            0% {
-                left: -100%;
-            }
-            100% {
-                left: 100%;
-            }
-        }
-        .tools-card::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border: 1px solid transparent;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 50%, rgba(255, 255, 255, 0.15) 100%);
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-        .tools-modal.active .tools-card::after {
-            opacity: 1;
-        }
-        .tools-card h3 {
-            color: var(--fg-primary);
-            margin-bottom: 24px;
-            font-weight: 400;
-            letter-spacing: 2px;
-        }
-        .tools-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .tools-link {
-            display: block;
-            width: 100%;
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-primary);
-            padding: 12px;
-            text-decoration: none;
-            font-family: var(--font-mono);
-            font-size: 0.9rem;
-            letter-spacing: 1px;
-            transition: background var(--transition-speed);
-        }
-        .tools-link:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .tools-close {
-            margin-top: 20px;
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-secondary);
-            padding: 6px 20px;
-            font-family: var(--font-mono);
-            cursor: pointer;
-            font-size: 0.8rem;
-        }
-        .tools-close:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .tools-modal.closing {
-            background: rgba(0, 0, 0, 0);
-            pointer-events: none;
-        }
-        .tools-modal.closing .tools-card {
-            transform: scale(0.8);
-            opacity: 0;
-        }
-        .copy-toast {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-            padding: 8px 24px;
-            border-radius: 4px;
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-            z-index: 9999;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-        .copy-toast.show {
-            opacity: 1;
-        }
-        .alert-modal {
-            position: fixed;
-            z-index: 5000;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-        .alert-modal.active {
-            display: flex;
-        }
-        .alert-card {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            padding: 32px 40px;
-            max-width: 400px;
-            text-align: center;
-        }
-        .alert-icon-text {
-            font-size: 3rem;
-            color: var(--error-color);
-            margin-bottom: 20px;
-            font-weight: bold;
-            animation: errorTextFlicker 2s infinite;
-        }
-        @keyframes errorTextFlicker {
-            0%,
-            19%,
-            21%,
-            23%,
-            25%,
-            54%,
-            56%,
-            100% {
-                opacity: 1;
-            }
-            20%,
-            24%,
-            55% {
-                opacity: 0.4;
-            }
-        }
-        .alert-card h2 {
-            color: var(--fg-primary);
-            font-size: 1.6rem;
-            margin-bottom: 12px;
-            font-weight: 400;
-        }
-        .alert-card p {
-            color: var(--fg-muted);
-            font-size: 0.95rem;
-            margin-bottom: 28px;
-        }
-        .alert-card .modal-btn {
-            width: 100%;
-            padding: 12px 20px;
-            font-size: 1rem;
-            border-width: 2px;
-        }
-        .emoji-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-            gap: 10px;
-        }
-        .emoji-item-wrapper {
-            position: relative;
-            width: 100%;
-            height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--border-color);
-            overflow: hidden;
-        }
-        .emoji-grid img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        .emoji-grid img:hover {
-            transform: scale(1.05);
-        }
-        .emoji-delete-btn {
-            position: absolute;
-            top: 2px;
-            right: 2px;
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            color: var(--fg-secondary);
-            font-size: 12px;
-            width: 18px;
-            height: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all var(--transition-speed);
-            z-index: 1;
-        }
-        .emoji-delete-btn:hover {
-            background: var(--error-color);
-            color: #fff;
-            border-color: var(--error-color);
-        }
-        .emoji-upload-btn {
-            margin-bottom: 16px;
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-primary);
-            padding: 8px 16px;
-            font-family: var(--font-mono);
-            cursor: pointer;
-            transition: all var(--transition-speed);
-        }
-        .emoji-upload-btn:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
+// 权限判断：permissions 含 "*" 或具体权限点即视为拥有
+function can(permission) {
+    const list = (window.CHAT_CONFIG && window.CHAT_CONFIG.permissions) || [];
+    return list.indexOf('*') !== -1 || list.indexOf(permission) !== -1;
+}
 
-        /* ===== 🆕 分享工具栏 & 选择模式 ===== */
-        #share-toolbar {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 12px;
-            border: 1px solid var(--border-color);
-            margin: 8px 0 12px 0;
-            flex-wrap: wrap;
-            background: var(--bg-secondary);
-            transition: all var(--transition-speed);
-        }
-        #share-toolbar .share-btn {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-primary);
-            padding: 6px 16px;
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all var(--transition-speed);
-            letter-spacing: 0.5px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        #share-toolbar .share-btn:hover:not(:disabled) {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        #share-toolbar .share-btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-        #share-toolbar .share-btn.active-mode {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-            border-color: var(--fg-primary);
-        }
-        #share-toolbar .share-count {
-            color: var(--fg-muted);
-            font-size: 0.8rem;
-            margin-left: 4px;
-            min-width: 60px;
-        }
-        #share-toolbar .share-divider {
-            color: var(--border-color);
-            font-size: 1.2rem;
-            user-select: none;
-        }
-
-        /* 消息 checkbox 容器 */
-        .msg-checkbox-wrap {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-shrink: 0;
-        }
-        .msg-checkbox-wrap input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: var(--fg-primary);
-            cursor: pointer;
-            flex-shrink: 0;
-            background: transparent;
-            border: 1px solid var(--border-color);
-            appearance: none;
-            -webkit-appearance: none;
-            border-radius: 3px;
-            position: relative;
-            transition: all 0.15s;
-        }
-        .msg-checkbox-wrap input[type="checkbox"]:checked {
-            background: var(--fg-primary);
-            border-color: var(--fg-primary);
-        }
-        .msg-checkbox-wrap input[type="checkbox"]:checked::after {
-            content: '✓';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: var(--bg-primary);
-            font-size: 13px;
-            font-weight: bold;
-        }
-        .msg-checkbox-wrap input[type="checkbox"]:hover {
-            border-color: var(--fg-primary);
-        }
-
-        /* 选择模式下消息hover效果 */
-        #sd.select-mode li:not(.time-separator) {
-            cursor: pointer;
-            transition: background 0.1s;
-        }
-        #sd.select-mode li:not(.time-separator):hover {
-            background: rgba(255, 255, 255, 0.04);
-        }
-
-        /* ===== 🆕 分享预览专用样式 ===== */
-        .share-preview-container {
-            background: var(--preview-bg);
-            color: var(--preview-text);
-            padding: 20px;
-            font-family: var(--font-mono);
-            max-height: 60vh;
-            overflow-y: auto;
-            width: 100%;
-        }
-        .share-preview-container .preview-header {
-            text-align: center;
-            font-size: 1.1rem;
-            letter-spacing: 4px;
-            color: var(--fg-muted);
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 12px;
-            margin-bottom: 16px;
-            text-transform: uppercase;
-        }
-        .share-preview-container .preview-message {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            margin-bottom: 14px;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        }
-        .share-preview-container .preview-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: 500;
-            text-transform: uppercase;
-            flex-shrink: 0;
-            background: var(--avatar-bg);
-            color: var(--fg-primary);
-            border: 2px solid;
-        }
-        .share-preview-container .preview-body {
-            flex: 1;
-            min-width: 0;
-        }
-        .share-preview-container .preview-sender {
-            font-size: 0.75rem;
-            color: var(--fg-muted);
-            letter-spacing: 1px;
-        }
-        .share-preview-container .preview-bubble {
-            padding: 8px 12px;
-            border: 1px solid var(--bubble-border);
-            background: var(--other-bg);
-            color: var(--other-text);
-            border-radius: var(--bubble-radius);
-            font-size: var(--message-font-size);
-            line-height: 1.5;
-            word-wrap: break-word;
-            margin-top: 2px;
-        }
-        .share-preview-container .preview-bubble .mention {
-            color: var(--mention-color);
-            background: var(--mention-bg);
-            padding: 0 2px;
-            border-radius: 2px;
-            font-weight: 500;
-        }
-        .share-preview-container .preview-bubble img.emoji-inline {
-            max-width: 120px;
-            max-height: 120px;
-            width: auto;
-            height: auto;
-            object-fit: contain;
-            display: inline-block;
-        }
-        .share-preview-container .preview-bubble.single-attachment {
-            border: none;
-            padding: 0;
-            background: transparent;
-        }
-        .share-preview-container .preview-bubble.single-attachment>a,
-        .share-preview-container .preview-bubble.single-attachment>.image-preview-link,
-        .share-preview-container .preview-bubble.single-attachment>audio,
-        .share-preview-container .preview-bubble.single-attachment>img {
-            display: block;
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid var(--bubble-border);
-            background: var(--other-bg);
-            color: var(--other-text);
-            text-decoration: none;
-            font-size: var(--message-font-size);
-            border-radius: var(--bubble-radius);
-            max-width: 100%;
-            height: auto;
-        }
-        .share-preview-container .preview-bubble.single-attachment .image-preview-link img {
-            max-width: 100%;
-            display: block;
-            border: none;
-        }
-        .share-preview-container .preview-bubble.single-attachment>audio {
-            width: 100%;
-            border-radius: 0;
-            padding: 0;
-        }
-        .share-preview-container .preview-empty {
-            text-align: center;
-            color: var(--fg-muted);
-            padding: 40px 0;
-        }
-
-        .share-preview-footer {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            padding: 16px 0 8px 0;
-            border-top: 1px solid var(--border-color);
-            margin-top: 12px;
-            flex-wrap: wrap;
-        }
-        .share-preview-footer .share-btn {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-primary);
-            padding: 8px 24px;
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all var(--transition-speed);
-            letter-spacing: 1px;
-        }
-        .share-preview-footer .share-btn:hover {
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .share-preview-footer .share-btn.primary {
-            border-color: var(--fg-primary);
-            background: var(--fg-primary);
-            color: var(--bg-primary);
-        }
-        .share-preview-footer .share-btn.primary:hover {
-            background: transparent;
-            color: var(--fg-primary);
-        }
-
-        /* 截图中临时隐藏滚动条 */
-        .no-scrollbar::-webkit-scrollbar {
-            width: 0 !important;
-            height: 0 !important;
-        }
-        .no-scrollbar {
-            scrollbar-width: none !important;
-            -ms-overflow-style: none !important;
-        }
-
-        @media (max-width: 480px) {
-            #chat {
-                padding: 15px;
-            }
-            .chat-header p {
-                font-size: 1.4rem !important;
-            }
-            #share-toolbar {
-                gap: 6px;
-                padding: 8px;
-            }
-            #share-toolbar .share-btn {
-                font-size: 0.7rem;
-                padding: 4px 10px;
-            }
-            .message-content {
-                max-width: 82%;
-            }
-            .input-row {
-                gap: 7px;
-            }
-            .file-field {
-                flex: 0 0 auto;
-            }
-        }
-    </style>
-</head>
-
-<body id="body">
-    <div class="background" style="display:none;"></div>
-
-    <!-- 主题切换 -->
-    <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
-        <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
-    </button>
-
-    <!-- 外观 & 工具按钮 -->
-    <div class="appearance-btn" id="appearanceBtn" title="外观设置">⚙</div>
-    <div class="tools-btn" id="toolsBtn" title="工具集">🔧</div>
-
-    <!-- 工具弹窗 -->
-    <div class="tools-modal" id="toolsModal">
-        <div class="tools-card">
-            <h3>快捷工具</h3>
-            <div class="tools-list">
-                <a href="http://121.40.70.144:7088/tree" target="_blank" class="tools-link">⊞ 树图生成器</a>
-                <a href="http://121.40.70.144:7088/vote/admin/login" target="_blank" class="tools-link">◫ 投票统计器</a>
-                <a href="https://shenyh.cn:18080" target="_blank" class="tools-link">⌨ code-server</a>
-                <a href="https://shenyh.cn" target="_blank" class="tools-link">✎ Syh's Blog</a>
-                <a href="https://shenyh.cn:7500" target="_blank" class="tools-link">⊡ Gitea</a>
-                <a href="https://shenyh.cn:28080" target="_blank" class="tools-link">☗ 虚始 · 莫空 Wiki</a>
-                <a href="http://121.40.70.144:7782" target="_blank" class="tools-link">❐ Minecraft Opanel</a>
-            </div>
-            <button class="tools-close" id="toolsCloseBtn">关闭</button>
-        </div>
-    </div>
-
-    <!-- 复制提示 -->
-    <div class="copy-toast" id="copyToast">复制成功</div>
-
-    <!-- 会话失效弹窗 -->
-    <div class="alert-modal" id="sessionAlert">
-        <div class="alert-card">
-            <div class="alert-icon-text">!</div>
-            <h2>登录已失效</h2>
-            <p>您的登录凭证已过期，请重新登录。</p>
-            <button class="modal-btn" id="alertConfirmBtn">确认</button>
-        </div>
-    </div>
-
-    <div class="action-dialog" id="actionDialog" role="dialog" aria-modal="true" aria-hidden="true">
-        <div class="action-dialog-card">
-            <h3 id="actionDialogTitle">确认操作</h3>
-            <p id="actionDialogMessage"></p>
-            <div class="action-dialog-actions">
-                <button type="button" id="actionDialogCancel">取消</button>
-                <button type="button" class="primary" id="actionDialogConfirm">确认</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="message-menu" id="messageMenu" role="menu">
-        <button type="button" data-action="reply">↩ 回复</button>
-        <button type="button" data-action="copy">⧉ 复制</button>
-        <button type="button" data-action="recall">⌫ 撤回</button>
-    </div>
-    <div class="avatar-menu" id="avatarMenu" role="menu">
-        <button type="button" data-action="mute">⊘ 禁言</button>
-        <button type="button" data-action="unmute">⊙ 解除禁言</button>
-    </div>
-
-    <!-- ========== 主聊天区域 ========== -->
-    <p style="color: var(--fg-muted); align-self: flex-start; margin-left: 15px; margin-bottom: 8px; font-size:0.8rem; letter-spacing:2px;">✦ chatter boot complete ✦</p>
-
-    <div id="chat">
-        <div class="chat-header"><p>syh's chatter</p></div>
-        <div class="chat-divider"></div>
-        <div style="padding-left:8px;padding-right:8px;">
-            <p class="system-message">[聊天室]: <span>IP checked ......</span></p>
-        </div>
-
-        <!-- 消息列表 -->
-        <div id="sd"><ul id="message-list"></ul></div>
-
-        <!-- ===== 🆕 分享工具栏 ===== -->
-        <div id="share-toolbar">
-            <button class="share-btn" id="selectModeBtn">☑ 选择消息</button>
-            <button class="share-btn" id="generateShareBtn" disabled>🖼 生成分享图片</button>
-            <span class="share-divider">|</span>
-            <span class="share-count" id="selectedCount">已选: 0 条</span>
-            <button class="share-btn" id="cancelSelectBtn" style="display:none;">✕ 取消选择</button>
-        </div>
-
-        <!-- 用户信息 -->
-        <div class="user-info">
-            <p class="user-name"><span style="width:24px;height:24px;border-radius:50%;background:var(--avatar-bg);border:1px solid;display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-right:6px;">{{ username[0].upper() }}</span>{{ username }}</p>
-            <div class="online-status"><span class="online-dot"></span><span class="online-label">在线</span><div class="user-tags" id="userTags"></div></div>
-        </div>
-
-        <!-- 管理员面板 -->
-        {% if is_admin %}
-        <div class="admin-panel"><p>快捷命令</p><div class="command-buttons"><button class="cmd-btn" data-cmd="clear">clear</button><button class="cmd-btn" data-cmd="change_color [用户名] [颜色]">change_color</button><button class="cmd-btn" data-cmd="delete [数量]">delete</button><button class="cmd-btn" data-cmd="change_color 梨岚 #ff0000">梨岚红色</button><button class="cmd-btn" data-cmd="change_color 梨岚 #00ff00">梨岚绿色</button><button class="cmd-btn" data-cmd="delete 1">delete 1</button><button class="cmd-btn" data-cmd="delete 5">delete 5</button><button class="cmd-btn" data-cmd="unknown">未知命令</button></div></div>
-        {% endif %}
-
-        <!-- 输入区域 -->
-        <div id="chat-combined">
-            <div class="mute-status" id="muteStatus" aria-live="polite"></div>
-            <div class="reply-compose" id="replyCompose">
-                <span>↩</span>
-                <span class="reply-compose-text" id="replyComposeText"></span>
-                <button type="button" id="cancelReplyBtn" aria-label="取消回复">×</button>
-            </div>
-            <div class="input-row">
-                <div class="text-field">
-                    <input type="text" name="upload_value" id="upft" placeholder="输入文字...">
-                    <div class="warning-hint" id="warningHint" style="display:none;"></div>
-                    <div class="autocomplete-menu"></div>
-                </div>
-                <div class="file-field">
-                    <button type="button" class="file-picker-button" id="filePickerBtn" title="选择文件" aria-label="选择文件">
-                        <img src="/static/upload.png" alt="">
-                    </button>
-                    <input type="file" name="file" id="file-input" hidden>
-                </div>
-                <div class="send-btn">
-                    <button type="button" id="sendBtn">发送</button>
-                    <button type="button" class="text-file-send-btn" id="textFileSendBtn" title="发送文本文件">☐</button>
-                    <button type="button" class="emoji-input-btn" id="emojiInputBtn" title="表情包">⌘</button>
-                </div>
-            </div>
-            <div class="filename-hint" id="fileHint"></div>
-        </div>
-    </div>
-
-    <!-- ========== JS 依赖 ========== -->
-    <script src="static/js/highlight.js/highlight.min.js"></script>
-    <script type="text/javascript" src="static/js/jquery/jquery.min.js"></script>
-    <script type="text/javascript" src="static/js/jquery/jquery.form.js"></script>
-
-    <script>
         document.addEventListener('DOMContentLoaded', function() {
 
             // ================================================================
@@ -1914,8 +74,8 @@
             function updateHighlightTheme() {
                 let desired = settings.highlightTheme;
                 if (desired === 'auto') desired = settings.theme === 'light' ? 'light' : 'dark';
-                const href = desired === 'light' ? 'static/js/highlight.js/styles/atom-one-light.min.css' :
-                    'static/js/highlight.js/styles/atom-one-dark.min.css';
+                const href = desired === 'light' ? u('/static/js/highlight.js/styles/atom-one-light.min.css') :
+                    u('/static/js/highlight.js/styles/atom-one-dark.min.css');
                 if (hlLink.getAttribute('href') !== href) hlLink.setAttribute('href', href);
             }
 
@@ -1929,16 +89,7 @@
                 localStorage.setItem('avatarBorderWidth', settings.avatarBorderWidth);
                 localStorage.setItem('onlineDotSize', settings.onlineDotSize);
             }
-            applyAllSettings();
-            if (settings.theme === 'light') {
-                document.body.classList.add('light-theme');
-                document.getElementById('modeIndicator').textContent = '亮';
-            } else {
-                document.body.classList.remove('light-theme');
-                document.getElementById('modeIndicator').textContent = '暗';
-            }
-            document.getElementById('themeToggle').addEventListener('click', () => {
-                settings.theme = settings.theme === 'light' ? 'dark' : 'light';
+            function applyThemeState() {
                 if (settings.theme === 'light') {
                     document.body.classList.add('light-theme');
                     document.getElementById('modeIndicator').textContent = '亮';
@@ -1948,6 +99,54 @@
                 }
                 applyAllSettings();
                 saveAllSettings();
+            }
+            applyThemeState();
+
+            // 主题圆圈扩散动画：遮罩内承载"新主题克隆页"，入场动画随圆扩散依次播放
+            // 真实页面保持旧主题直至扩散完成，圆外旧主题、圆内新主题动画
+            // （prefers-reduced-motion 时直接切换，不创建遮罩）
+            function themeCircleTransition(cx, cy) {
+                const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                if (reduce) { applyThemeState(); return; }
+                document.querySelectorAll('.theme-transition').forEach(n => n.remove());
+                // 高亮代码主题随目标主题先行切换（真实与克隆页共用文档级样式表）
+                const hlHref = settings.theme === 'light' ?
+                    u('/static/js/highlight.js/styles/atom-one-light.min.css') :
+                    u('/static/js/highlight.js/styles/atom-one-dark.min.css');
+                if (hlLink.getAttribute('href') !== hlHref) hlLink.setAttribute('href', hlHref);
+                // 1. 克隆当前页面并套用目标主题
+                const clone = document.body.cloneNode(true);
+                clone.classList.toggle('light-theme', settings.theme === 'light');
+                clone.querySelectorAll('script, .draggable-window, .theme-transition').forEach(n => n.remove());
+                const mi = clone.querySelector('#modeIndicator');
+                if (mi) mi.textContent = settings.theme === 'light' ? '亮' : '暗';
+                // 2. 遮罩容器承载克隆体，从按钮中心扩散
+                // 挂到 document.documentElement（真实 body 之外），避免克隆体
+                // 从仍带 light-theme 的真实 body 继承错误的主题变量
+                const overlay = document.createElement('div');
+                overlay.className = 'theme-transition';
+                overlay.style.clipPath = `circle(0px at ${cx}px ${cy}px)`;
+                overlay.appendChild(clone);
+                document.documentElement.appendChild(overlay);
+                overlay.offsetWidth; // 强制重排，确保动画从起始状态开始
+                const maxR = Math.hypot(Math.max(cx, window.innerWidth - cx),
+                                        Math.max(cy, window.innerHeight - cy)) + 20;
+                overlay.style.clipPath = `circle(${maxR}px at ${cx}px ${cy}px)`;
+                // 3. 扩散完成：真实页面切换主题并移除遮罩。
+                // 先禁用 body 的 0.15s 背景/颜色过渡（否则遮罩消失瞬间会看到
+                // 真实页面重新渐变一遍 = 闪烁），下一帧再恢复。
+                setTimeout(() => {
+                    document.body.style.transition = 'none';
+                    applyThemeState();
+                    overlay.remove();
+                    requestAnimationFrame(() => { document.body.style.transition = ''; });
+                }, 500);
+            }
+
+            document.getElementById('themeToggle').addEventListener('click', () => {
+                settings.theme = settings.theme === 'light' ? 'dark' : 'light';
+                const r = document.getElementById('themeToggle').getBoundingClientRect();
+                themeCircleTransition(r.left + r.width / 2, r.top + r.height / 2);
             });
 
             // ================================================================
@@ -2095,7 +294,7 @@
                 win.style.width = '600px';
                 win.style.opacity = '0';
                 win.innerHTML =
-                    `<div class="window-titlebar"><span class="window-title">${title}</span><div class="window-actions"><button class="window-btn copy-content-btn" style="display:none;">复制</button><button class="window-btn download-window-btn" style="display:none;">下载</button><button class="window-btn close-window-btn">✕</button></div></div>${showProgress?'<div class="window-progress"><div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div><div class="progress-text">准备下载...</div></div>':''}<div class="window-content">${html}</div>`;
+                    `<div class="window-titlebar"><span class="window-title">${title}</span><div class="window-actions"><button class="window-btn copy-content-btn" style="display:none;">复制</button><button class="window-btn download-window-btn" style="display:none;">下载</button><button class="window-btn close-window-btn"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></div></div>${showProgress?'<div class="window-progress"><div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div><div class="progress-text">准备下载...</div></div>':''}<div class="window-content">${html}</div>`;
                 document.body.appendChild(win);
                 const titlebar = win.querySelector('.window-titlebar');
                 const contentArea = win.querySelector('.window-content');
@@ -2137,7 +336,7 @@
                     `<div class="settings-menu-container"><button class="settings-menu-btn" data-page="interface" style="--stripe-color: #2a6df4;"><span>界面显示</span></button><button class="settings-menu-btn" data-page="chat" style="--stripe-color: #f45b2a;"><span>聊天样式</span></button><button class="settings-menu-btn" data-page="theme" style="--stripe-color: #4caf50;"><span>主题与代码</span></button></div><div class="code-scroller"><div class="code-scroll-inner">${randomCode()+'\n'+randomCode()}</div></div>`;
                 else {
                     html =
-                        `<div style="width:100%; display:flex; justify-content:flex-start; margin-bottom:10px;"><button class="back-btn" data-page="main">← 返回</button></div>`;
+                        `<div style="width:100%; display:flex; justify-content:flex-start; margin-bottom:10px;"><button class="back-btn" data-page="main"><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"/></svg> 返回</button></div>`;
                     if (page === 'interface') html +=
                         `<div class="settings-row"><label>整体字体大小</label><input type="range" id="fontSizeRange" min="12" max="24" value="${settings.fontSize}" step="1"><span id="fontSizeValue">${settings.fontSize}px</span></div><div class="settings-row"><label>头像大小</label><input type="range" id="avatarSizeRange" min="28" max="48" value="${settings.avatarSize}" step="1"><span id="avatarSizeValue">${settings.avatarSize}px</span></div><div class="settings-row"><label>头像边框粗细</label><input type="range" id="avatarBorderRange" min="0" max="6" value="${settings.avatarBorderWidth}" step="1"><span id="avatarBorderValue">${settings.avatarBorderWidth}px</span></div><div class="settings-row"><label>在线点大小</label><input type="range" id="onlineDotRange" min="6" max="14" value="${settings.onlineDotSize}" step="1"><span id="onlineDotValue">${settings.onlineDotSize}px</span></div>`;
                     else if (page === 'chat') html +=
@@ -2186,11 +385,7 @@
                 } else if (page === 'theme') {
                     document.getElementById('themeSelect').addEventListener('change', (e) => { settings.theme = e
                             .target.value;
-                        document.body.classList.toggle('light-theme', settings.theme === 'light');
-                        document.getElementById('modeIndicator').textContent = settings.theme === 'light' ?
-                            '亮' : '暗';
-                        applyAllSettings();
-                        saveAllSettings(); });
+                        applyThemeState(); });
                     document.getElementById('highlightSelect').addEventListener('change', (e) => { settings
                             .highlightTheme = e.target.value;
                         updateHighlightTheme();
@@ -2199,7 +394,11 @@
             }
 
             document.getElementById('appearanceBtn').addEventListener('click', () => {
-                const w = createDraggableWindow('外观设置', '', false);
+                if (openWindows['settings']) {
+                    bringWindowToFront(openWindows['settings']);
+                    return;
+                }
+                const w = createDraggableWindow('外观设置', '', false, 'settings');
                 buildSettingsSubpage(w, 'main');
             });
 
@@ -2269,7 +468,7 @@
                     dw.style.display = 'inline-block';
                     dw.onclick = () => fileDownload(url, filename);
                     openWindows[url] = w;
-                    fetch('/api/cpp-preview?filename=' + encodeURIComponent(filename) + '&update=' + encodeURIComponent(upd))
+                    fetch(u('/api/cpp-preview?filename=' + encodeURIComponent(filename) + '&update=' + encodeURIComponent(upd)))
                         .then(response => response.ok ? response.json() : response.json().then(body => Promise.reject(body)))
                         .then(body => {
                             const code = document.createElement('code');
@@ -2373,13 +572,13 @@
 
             function loadEmojiList(win) {
                 const cd = win.querySelector('.window-content');
-                $.get('/chat/emoji/list/' + encodeURIComponent(currentUser) + '?update=' + encodeURIComponent(upd), function(data) {
+                $.get(u('/chat/emoji/list/' + encodeURIComponent(currentUser) + '?update=' + encodeURIComponent(upd)), function(data) {
                     let html = '<button class="emoji-upload-btn" id="emojiUploadBtn">＋ 上传表情包</button>';
                     html += '<div class="emoji-grid">';
                     if (data && data.length > 0) {
                         data.forEach(fn => {
                             html +=
-                                `<div class="emoji-item-wrapper"><img src="/chat/emoji/static/${currentUser}/${fn}" alt="${fn}" title="${fn}" class="emoji-item" data-filename="${fn}"><span class="emoji-delete-btn" data-filename="${fn}" title="删除">×</span></div>`;
+                                `<div class="emoji-item-wrapper"><img src="${u('/chat/emoji/static/')}${currentUser}/${fn}" alt="${fn}" title="${fn}" class="emoji-item" data-filename="${fn}"><span class="emoji-delete-btn" data-filename="${fn}" title="删除"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></span></div>`;
                         });
                     } else {
                         html += '<p style="color:var(--fg-muted); grid-column:1/-1; text-align:center;">还没有表情包</p>';
@@ -2398,7 +597,7 @@
                             fd.append('username', currentUser);
                             fd.append('update', upd);
                             $.ajax({
-                                url: '/chat/emoji/upload',
+                                url: u('/chat/emoji/upload'),
                                 type: 'POST',
                                 data: fd,
                                 processData: false,
@@ -2424,7 +623,7 @@
                             const fn = this.getAttribute('data-filename');
                             if (confirm('确定要删除这个表情包吗？')) {
                                 $.ajax({
-                                    url: '/chat/emoji/delete',
+                                    url: u('/chat/emoji/delete'),
                                     type: 'POST',
                                     data: { username: currentUser, filename: fn, update: upd },
                                     success: function(res) {
@@ -2460,7 +659,7 @@
             let allUsers = [];
 
             function fetchUserList() {
-                $.get('/username-list', function(data) {
+                $.get(u('/username-list'), function(data) {
                     if (data) allUsers = data.split('||').filter(u => u.trim() !== '');
                 }).fail(function() { console.warn('获取用户名列表失败'); });
             }
@@ -2567,15 +766,15 @@
             // ================================================================
             //  9. 聊天核心（原有，但修改了 update 以支持选择模式）
             // ================================================================
-            var currentUser = {{ username|tojson }};
-            let upd = {{ update|tojson }};
-            const currentUserIsAdmin = {{ is_admin|tojson }};
+            var currentUser = window.CHAT_CONFIG.username;
+            let upd = window.CHAT_CONFIG.update;
+            const currentUserIsAdmin = window.CHAT_CONFIG.is_admin;
             let tc = 0;
             let lastOnlineUsersStr = null;
             let updateInterval, loginInterval, muteInterval;
             let isSending = false;
             let sessionValid = true;
-            let muteUntil = {{ mute_until|tojson }} * 1000;
+            let muteUntil = window.CHAT_CONFIG.mute_until * 1000;
             let clockOffset = 0;
             let pendingReply = null;
             let knownMessageIds = null;
@@ -2729,7 +928,7 @@
 
             function sendTextMessage(text, callback) {
                 $.ajax({
-                    url: '/chatts-new?update=' + encodeURIComponent(upd),
+                    url: u('/chatts-new?update=') + encodeURIComponent(upd),
                     type: 'POST',
                     data: { upload_value: text, username: currentUser, update: upd, reply_to: pendingReply ? pendingReply.id : '' },
                     success: function(body) {
@@ -2760,7 +959,7 @@
                         fd.append('update', upd);
                         fd.append('reply_to', replyId);
                         $.ajax({
-                            url: '/chatts_file?update=' + encodeURIComponent(upd),
+                            url: u('/chatts_file?update=') + encodeURIComponent(upd),
                             type: 'POST', data: fd, processData: false, contentType: false,
                             success: function(body) {
                                 upd = body.update || upd;
@@ -2793,7 +992,7 @@
                 $('#upft').val('command: ' + $(this).data('cmd')).focus();
             });
             const sessionAlert = document.getElementById('sessionAlert');
-            document.getElementById('alertConfirmBtn').addEventListener('click', () => window.location.replace('/'));
+            document.getElementById('alertConfirmBtn').addEventListener('click', () => window.location.replace(BASE_PATH + '/'));
 
             function showSessionAlert() {
                 if (!sessionAlert.classList.contains('active')) {
@@ -2893,7 +1092,7 @@
                 const sd = document.getElementById('sd');
                 if (selectMode) {
                     btn.classList.add('active-mode');
-                    btn.textContent = '☑ 退出选择';
+                    btn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-check-square"/></svg> 退出选择';
                     sd.classList.add('select-mode');
                     // 取消选择按钮显示（如果有选中）
                     if (selectedIds.size > 0) {
@@ -2901,7 +1100,7 @@
                     }
                 } else {
                     btn.classList.remove('active-mode');
-                    btn.textContent = '☑ 选择消息';
+                    btn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-check-square"/></svg> 选择消息';
                     sd.classList.remove('select-mode');
                     document.getElementById('cancelSelectBtn').style.display = 'none';
                     // 不清除选中，但生成按钮状态更新
@@ -2926,159 +1125,6 @@
                 }
             }
 
-            // ---- 渲染消息（从 update 中抽离） ----
-            function renderMessagesLegacy(result) {
-                let chats = result[0].split(' || ');
-                let users = result[1].split(' || ');
-                let colors = result[2].split(' || ');
-                let times = result[3].split(' || ');
-                let timestamps = times.map(t => parseTimeToTimestamp(t));
-                let valid = [];
-                for (let i = 0; i < chats.length; i++) {
-                    if (users[i] && users[i] !== '') valid.push(i);
-                }
-                let ul = document.getElementById('message-list');
-                ul.innerHTML = '';
-                let lastT = null;
-
-                for (let idx = 0; idx < valid.length; idx++) {
-                    let i = valid[idx],
-                        ct = timestamps[i];
-                    if (lastT !== null && (ct - lastT) / 1000 > TIME_THRESHOLD) {
-                        let sep = document.createElement('li');
-                        sep.className = 'time-separator';
-                        sep.innerHTML = `<span>${formatTimeForSeparator(ct)}</span>`;
-                        ul.appendChild(sep);
-                    }
-                    let li = document.createElement('li');
-
-                    if (users[i] == 'admin' && chats[i] == 'clear') {
-                        li.innerHTML = '<p class="clear-message">--- 管理员清除了日志 ---</p>';
-                    } else {
-                        let isOwn = (users[i] === currentUser);
-                        let avatar = users[i].charAt(0).toUpperCase();
-                        let msgId = getMsgId(users[i], chats[i], times[i]);
-                        let checked = selectedIds.has(msgId) ? 'checked' : '';
-
-                        // 构建消息内容
-                        let cHtml = '',
-                            single = false;
-                        let rawContent = chats[i];
-                        if (rawContent.slice(0, 8) === '::file::') {
-                            let fn = rawContent.substr(8);
-                            cHtml =
-                                `<a href="javascript:void(0);" class="file-link" data-url="./static/uploads/${fn}" data-filename="${fn}">[文件] ${fn}</a>`;
-                            single = (rawContent.trim() === '::file::' + fn);
-                        } else if (rawContent.slice(0, 7) === '::img::') {
-                            let iname = rawContent.substr(7);
-                            cHtml =
-                                `<a href="javascript:void(0);" class="image-preview-link" data-src="./static/uploads/${iname}"><img src="./static/uploads/${iname}" style="max-width:200px;"></a>`;
-                            single = (rawContent.trim() === '::img::' + iname);
-                        } else if (rawContent.slice(0, 7) === '::wav::') {
-                            let wn = rawContent.substr(7);
-                            cHtml = `<audio controls src="./static/uploads/${wn}"></audio>`;
-                            single = (rawContent.trim() === '::wav::' + wn);
-                        } else if (rawContent.slice(0, 9) === '::emoji::') {
-                            let emojiName = rawContent.substr(9);
-                            cHtml =
-                                `<img src="/chat/emoji/static/${users[i]}/${emojiName}" class="emoji-inline" style="max-width:150px; max-height:150px; width:auto; height:auto;" onerror="this.parentElement.innerHTML='<span style=\\'color:var(--fg-muted);\\'>表情包加载失败</span>'">`;
-                            single = (rawContent.trim() === '::emoji::' + emojiName);
-                        } else {
-                            cHtml = highlightMentionIfNeeded(rawContent, isOwn);
-                        }
-
-                        let bubbleClass = 'message-bubble' + (single ? ' single-attachment' : '');
-                        let senderHtml = isOwn ? '' : `<div class="message-sender">${users[i]}</div>`;
-
-                        // 构建 checkbox（选择模式下显示）
-                        let checkboxHtml = '';
-                        if (selectMode) {
-                            checkboxHtml =
-                                `<div class="msg-checkbox-wrap"><input type="checkbox" class="msg-checkbox" data-id="${msgId}" ${checked}></div>`;
-                        }
-
-                        // 组装 li
-                        // 自己的消息：checkbox 在右侧（消息内容右侧），其他人的在左侧
-                        let contentHtml =
-                            `<div class="msg-avatar" style="border-color:${colors[i]};color:var(--fg-primary);">${avatar}</div>`;
-                        contentHtml +=
-                            `<div class="message-content">${senderHtml}<div class="${bubbleClass}">${cHtml}</div></div>`;
-
-                        if (isOwn) {
-                            // 自己的消息：checkbox 在右侧（消息内容后面）
-                            if (selectMode) {
-                                li.innerHTML = contentHtml + checkboxHtml;
-                            } else {
-                                li.innerHTML = contentHtml;
-                            }
-                            li.classList.add('own-message');
-                        } else {
-                            // 其他人的消息：checkbox 在左侧
-                            if (selectMode) {
-                                li.innerHTML = checkboxHtml + contentHtml;
-                            } else {
-                                li.innerHTML = contentHtml;
-                            }
-                        }
-
-                        // 存储 msgId 到 li 元素，便于事件处理
-                        li.dataset.msgId = msgId;
-                    }
-                    ul.appendChild(li);
-                    lastT = ct;
-                }
-
-                // 绑定文件/图片点击事件
-                $('#message-list .message-bubble a').not('.file-link,.image-preview-link,.preview-link').each(function() {
-                    $(this).attr('target', '_blank').attr('rel', 'noopener noreferrer');
-                });
-                $('.file-link').off('click').on('click', function(e) {
-                    e.preventDefault();
-                    openFileWindow($(this).data('url'), $(this).data('filename'));
-                });
-                $('.image-preview-link').off('click').on('click', function(e) {
-                    e.preventDefault();
-                    let src = $(this).data('src');
-                    if (src) openFileWindow(src, src.split('/').pop());
-                });
-
-                // 绑定 checkbox 事件（选择模式）
-                if (selectMode) {
-                    document.querySelectorAll('.msg-checkbox').forEach(cb => {
-                        cb.addEventListener('change', function(e) {
-                            e.stopPropagation();
-                            const id = this.dataset.id;
-                            if (this.checked) {
-                                selectedIds.add(id);
-                            } else {
-                                selectedIds.delete(id);
-                            }
-                            updateSelectedCount();
-                            // 更新父 li 的选中样式（可选）
-                        });
-                        // 点击整个 li 触发 checkbox 切换（方便点选）
-                        const li = cb.closest('li');
-                        if (li) {
-                            li.addEventListener('click', function(e) {
-                                // 如果点击的是 checkbox 本身或内部链接，不重复触发
-                                if (e.target.closest('.msg-checkbox') || e.target.closest('a') || e.target
-                                    .closest('audio') || e.target.closest('img')) return;
-                                const c = this.querySelector('.msg-checkbox');
-                                if (c) {
-                                    c.checked = !c.checked;
-                                    c.dispatchEvent(new Event('change'));
-                                }
-                            });
-                        }
-                    });
-                }
-
-                // 滚动到底部
-                if (valid.length > 0) {
-                    let lastLi = ul.lastElementChild;
-                    if (lastLi) document.getElementById('sd').scrollTo(0, lastLi.offsetTop);
-                }
-            }
 
             function normalizePayload(payload) {
                 if (typeof payload === 'string') {
@@ -3223,7 +1269,7 @@
                     const link = document.createElement('a');
                     link.href = 'javascript:void(0)';
                     link.className = 'image-preview-link';
-                    link.dataset.src = './static/uploads/' + encodeURIComponent(filename);
+                    link.dataset.src = u('/static/uploads/') + encodeURIComponent(filename);
                     link.dataset.filename = filename;
                     const image = document.createElement('img');
                     image.src = link.dataset.src;
@@ -3235,13 +1281,13 @@
                 } else if (message.type === 'audio') {
                     const audio = document.createElement('audio');
                     audio.controls = true;
-                    audio.src = './static/uploads/' + encodeURIComponent(filename);
+                    audio.src = u('/static/uploads/') + encodeURIComponent(filename);
                     parent.appendChild(audio);
                 } else if (message.type === 'emoji') {
                     const image = document.createElement('img');
                     image.className = 'emoji-inline';
                     image.alt = filename;
-                    image.src = '/chat/emoji/static/' + encodeURIComponent(message.user) + '/' + encodeURIComponent(filename);
+                    image.src = u('/chat/emoji/static/') + encodeURIComponent(message.user) + '/' + encodeURIComponent(filename);
                     image.addEventListener('error', () => {
                         const fallback = document.createElement('span');
                         fallback.className = 'message-fallback';
@@ -3253,7 +1299,7 @@
                     const link = document.createElement('a');
                     link.href = 'javascript:void(0)';
                     link.className = 'file-link rich-link';
-                    link.dataset.url = './static/uploads/' + encodeURIComponent(filename);
+                    link.dataset.url = u('/static/uploads/') + encodeURIComponent(filename);
                     link.dataset.filename = filename;
                     link.textContent = '[文件] ' + filename;
                     parent.appendChild(link);
@@ -3507,7 +1553,7 @@
                 const message = contextMessage;
                 hideActionMenus();
                 openActionDialog('撤回消息', '确认撤回这条消息吗？', () => {
-                    postAction('/api/messages/' + encodeURIComponent(message.id) + '/recall', {})
+                    postAction(u('/api/messages/' + encodeURIComponent(message.id) + '/recall'), {})
                         .then(update)
                         .catch(error => alert(error.message));
                 });
@@ -3520,12 +1566,16 @@
                 hideActionMenus();
                 const menu = document.getElementById('messageMenu');
                 const recallButton = menu.querySelector('[data-action="recall"]');
-                recallButton.style.display = currentUserIsAdmin || message.user === currentUser ? 'block' : 'none';
+                recallButton.style.display = can('message.recall.any') || message.user === currentUser ? 'block' : 'none';
                 positionActionMenu(menu, x, y);
             }
 
             function openAvatarMenu(username, x, y) {
-                if (!currentUserIsAdmin || !username || username === currentUser || username === 'system' || username === 'admin' || username.includes('admin_permission')) return;
+                const muteVisible = can('moderation.mute');
+                const unmuteVisible = can('moderation.unmute');
+                if ((!muteVisible && !unmuteVisible) || !username || username === currentUser) return;
+                document.getElementById('avatarMuteBtn').style.display = muteVisible ? 'block' : 'none';
+                document.getElementById('avatarUnmuteBtn').style.display = unmuteVisible ? 'block' : 'none';
                 contextUser = username;
                 contextMessage = null;
                 hideActionMenus();
@@ -3559,12 +1609,12 @@
                         alert('禁言时长必须为 1-86400 秒');
                         return;
                     }
-                    postAction('/api/mute', { target: username, duration })
+                    postAction(u('/api/mute'), { target: username, duration })
                         .then(update)
                         .catch(error => alert(error.message));
                 } else if (action === 'unmute') {
                     openActionDialog('解除禁言', '确认解除 ' + username + ' 的禁言吗？', () => {
-                        postAction('/api/unmute', { target: username })
+                        postAction(u('/api/unmute'), { target: username })
                             .then(update)
                             .catch(error => alert(error.message));
                     });
@@ -3625,7 +1675,7 @@
             }
 
             // ================================================================
-            //  10. 🆕 分享工具栏事件绑定
+            //  10. 分享工具栏事件绑定
             // ================================================================
             document.getElementById('selectModeBtn').addEventListener('click', toggleSelectMode);
 
@@ -3674,7 +1724,7 @@
                 });
 
                 // 创建预览窗口
-                const previewWin = createDraggableWindow('📷 分享预览', '', false);
+                const previewWin = createDraggableWindow('<svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg> 分享预览', '', false);
                 const contentArea = previewWin.querySelector('.window-content');
                 contentArea.style.padding = '0';
                 contentArea.style.background = 'var(--preview-bg)';
@@ -3683,7 +1733,7 @@
                 // 构建预览 HTML
                 let previewHtml = `<div class="share-preview-container" id="sharePreviewContainer">`;
                 previewHtml +=
-                    `<div class="preview-header">✦ syh's chatter · 分享 ✦</div>`;
+                    `<div class="preview-header"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg> syh's chatter · 分享 <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg></div>`;
                 previewHtml += `<div id="previewMessages">`;
 
                 selectedMsgs.forEach((msg, idx) => {
@@ -3709,7 +1759,7 @@
                     } else if (raw.slice(0, 9) === '::emoji::') {
                         const emojiName = raw.substr(9);
                         contentHtml =
-                            `<img src="/chat/emoji/static/${msg.user}/${emojiName}" class="emoji-inline" style="max-width:120px; max-height:120px; width:auto; height:auto;" onerror="this.parentElement.innerHTML='<span style=\\'color:var(--fg-muted);\\'>表情包加载失败</span>'">`;
+                            `<img src="${u('/chat/emoji/static/')}${msg.user}/${emojiName}" class="emoji-inline" style="max-width:120px; max-height:120px; width:auto; height:auto;" onerror="this.parentElement.innerHTML='<span style=\\'color:var(--fg-muted);\\'>表情包加载失败</span>'">`;
                         single = (raw.trim() === '::emoji::' + emojiName);
                     } else {
                         contentHtml = highlightMentionIfNeeded(raw, isOwn);
@@ -3728,7 +1778,7 @@
 
                 previewHtml += `</div>`;
                 previewHtml +=
-                    `<div class="share-preview-footer"><button class="share-btn primary" id="downloadShareImgBtn">⬇ 下载图片</button><button class="share-btn" id="closePreviewBtn">关闭</button></div>`;
+                    `<div class="share-preview-footer"><button class="share-btn primary" id="downloadShareImgBtn"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg> 下载图片</button><button class="share-btn" id="closePreviewBtn">关闭</button></div>`;
                 previewHtml += `</div>`;
                 contentArea.innerHTML = previewHtml;
 
@@ -3823,7 +1873,7 @@
                     fd.append('update', upd);
                     fd.append('reply_to', pendingReply ? pendingReply.id : '');
                     $.ajax({
-                        url: '/chatts_file?update=' + encodeURIComponent(upd),
+                        url: u('/chatts_file?update=') + encodeURIComponent(upd),
                         type: 'POST',
                         data: fd,
                         processData: false,
@@ -3834,6 +1884,43 @@
                         error: function(xhr) { handleAjaxError(xhr, '发送失败'); }
                     });
                 });
+            }
+
+            // ================================================================
+            //  10.5 管理面板（Phase 6）：adminEntryBtn -> 弹窗加载 admin_content
+            // ================================================================
+            const adminEntryBtn = document.getElementById('adminEntryBtn');
+            if (adminEntryBtn) adminEntryBtn.addEventListener('click', openAdminPanel);
+
+            function openAdminPanel() {
+                if (openWindows['admin']) {
+                    bringWindowToFront(openWindows['admin']);
+                    return;
+                }
+                const w = createDraggableWindow('<svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> 管理面板', '<div class="admin-loading">加载中...</div>', false, 'admin');
+                w.style.width = '740px';
+                const c = w.querySelector('.window-content');
+                fetch(u('/admin/content?update=') + encodeURIComponent(upd))
+                    .then(r => {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return r.text();
+                    })
+                    .then(html => {
+                        c.innerHTML = html;
+                        if (window.ChatterAdmin) {
+                            window.ChatterAdmin.init();
+                            return;
+                        }
+                        const s = document.createElement('script');
+                        s.src = u('/static/js/admin.js');
+                        s.onload = () => {
+                            if (window.ChatterAdmin) window.ChatterAdmin.init();
+                        };
+                        document.head.appendChild(s);
+                    })
+                    .catch(err => {
+                        c.innerHTML = '<div class="admin-error">管理面板加载失败：' + err.message + '</div>';
+                    });
             }
 
             // ================================================================
@@ -3859,8 +1946,6 @@
             };
 
             update();
-            console.log('✅ 选择消息生成分享图片功能已加载');
+            console.log('选择消息生成分享图片功能已加载');
         });
-    </script>
-</body>
-</html>
+    

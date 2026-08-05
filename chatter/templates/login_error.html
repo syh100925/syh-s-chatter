@@ -331,6 +331,7 @@
     </style>
 </head>
 <body>
+    {% include '_icons.html' %}
     <!-- 主题切换按钮 -->
     <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
         <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
@@ -392,7 +393,7 @@
         </div>
 
         <!-- 返回按钮 -->
-        <a href="/" class="back-button">← 返回登录</a>
+        <a href="{{ base_path }}/" class="back-button"><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"/></svg> 返回登录</a>
 
         <!-- 底部提示 -->
         <div class="hint">

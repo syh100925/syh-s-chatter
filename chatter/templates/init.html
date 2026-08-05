@@ -221,6 +221,7 @@
     </style>
 </head>
 <body>
+    {% include '_icons.html' %}
     <!-- 主题切换按钮（保持不变） -->
     <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
         <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
@@ -242,7 +243,7 @@
         <div class="error-box">{{ error }}</div>
         {% endif %}
 
-        <form action="/init" method="POST" autocomplete="off" id="initForm">
+        <form action="{{ base_path }}/init" method="POST" autocomplete="off" id="initForm">
             <!-- 数据库配置 -->
             <div class="form-group">
                 <label for="db_ip">数据库 IP</label>
@@ -265,7 +266,7 @@
             </div>
             <div style="display: flex; gap: 12px; align-items: center; margin: 8px 0 16px 0;">
                 <button type="button" id="testDbBtn" style="background: transparent; border: 1px solid var(--border-color); color: var(--fg-secondary); padding: 6px 18px; font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer; letter-spacing: 1px; transition: all 0.2s;">
-                    🔌 测试连接
+                    <svg class="icon" aria-hidden="true" style="vertical-align:-2px;margin-right:4px;"><use href="#i-power"/></svg> 测试连接
                 </button>
                 <span id="pingResult" style="font-size: 0.8rem; color: var(--fg-secondary);"></span>
             </div>
@@ -275,6 +276,13 @@
                 <label for="server_ip">服务器地址 (IP 或域名)</label>
                 <input type="text" id="server_ip" name="server_ip" value="{{ server_ip or '' }}" placeholder="例如：192.168.1.100:5000" required>
                 <div class="hint">用于生成聊天室的跳转链接，<span style="color:var(--fg-secondary);">将自动识别当前访问地址</span></div>
+            </div>
+
+            <!-- 挂载路径（base_path） -->
+            <div class="form-group" style="margin-top:1.5rem;">
+                <label for="base_path">挂载路径（可选，留空为根路径）</label>
+                <input type="text" id="base_path" name="base_path" value="{{ base_path or '' }}" placeholder="例如：/chat">
+                <div class="hint">将聊天室挂载到指定子路径（如 <span style="color:var(--fg-secondary);">http://IP:5000/chat</span>），便于与其它服务共存</div>
             </div>
 
             <!-- 管理员账号 -->
@@ -353,12 +361,12 @@
             const dbPass = document.getElementById('db_pass').value.trim();
 
             if (!dbIp || !dbPort) {
-                pingResult.textContent = '⚠️ 请填写完整的数据库地址和端口';
+                pingResult.textContent = '请填写完整的数据库地址和端口';
                 pingResult.style.color = '#ffaa00';
                 return;
             }
 
-            pingResult.textContent = '⏳ 正在测试...';
+            pingResult.textContent = '正在测试...';
             pingResult.style.color = 'var(--fg-secondary)';
 
             try {
@@ -371,7 +379,7 @@
                 pingResult.textContent = data.message;
                 pingResult.style.color = data.success ? '#4caf50' : '#ff4444';
             } catch (error) {
-                pingResult.textContent = '❌ 请求失败: ' + error.message;
+                pingResult.textContent = '请求失败: ' + error.message;
                 pingResult.style.color = '#ff4444';
             }
         });

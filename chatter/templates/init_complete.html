@@ -279,6 +279,7 @@
     </style>
 </head>
 <body>
+    {% include '_icons.html' %}
     <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
         <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
     </button>
@@ -291,7 +292,7 @@
         </div>
 
         <div class="title">
-            <span class="success-icon">✓</span>
+            <span class="success-icon"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>
             <h1>SYH-CR</h1>
             <span class="divider"></span>
             <p>初始化已完成</p>
@@ -303,7 +304,7 @@
 
         <div class="codes-section">
             <div class="codes-header">
-                <span>📋 系统邀请码（用于注册新用户）</span>
+                <span><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg> 系统邀请码（用于注册新用户）</span>
                 <button class="copy-all-btn" id="copyAllBtn">复制全部</button>
             </div>
             <ul class="code-list" id="codeList">
@@ -321,7 +322,7 @@
             {% endif %}
         </div>
 
-        <a href="/" class="btn-login">前往登录</a>
+        <a href="{{ base_path }}/" class="btn-login">前往登录</a>
 
         <div class="footer-note">
             <span>请妥善保管邀请码</span>
@@ -409,7 +410,7 @@
             }
             navigator.clipboard.writeText(allText).then(() => {
                 showToast('已复制全部 ' + codes.length + ' 个邀请码');
-                this.textContent = '✓ 已复制';
+                this.textContent = '已复制';
                 setTimeout(() => {
                     this.textContent = '复制全部';
                 }, 1500);
@@ -422,7 +423,7 @@
                 document.execCommand('copy');
                 document.body.removeChild(textarea);
                 showToast('已复制全部 ' + codes.length + ' 个邀请码');
-                this.textContent = '✓ 已复制';
+                this.textContent = '已复制';
                 setTimeout(() => {
                     this.textContent = '复制全部';
                 }, 1500);

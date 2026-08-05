@@ -1,0 +1,25 @@
+{# 管理面板内容片段（聊天室弹窗与独立页共用，交互逻辑见 static/js/admin.js） #}
+<div class="admin-panel-root">
+    <div class="admin-tabs">
+        <button type="button" class="admin-tab active" data-tab="users"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg> 用户</button>
+        <button type="button" class="admin-tab" data-tab="groups"><svg class="icon" aria-hidden="true"><use href="#i-puzzle"/></svg> 权限组</button>
+        <button type="button" class="admin-tab" data-tab="plugins"><svg class="icon" aria-hidden="true"><use href="#i-power"/></svg> 插件</button>
+        <button type="button" class="admin-tab" data-tab="traffic"><svg class="icon" aria-hidden="true"><use href="#i-bar-chart"/></svg> 流量</button>
+        <button type="button" class="admin-tab" data-tab="database"><svg class="icon" aria-hidden="true"><use href="#i-database"/></svg> 数据库</button>
+        <button type="button" class="admin-tab" data-tab="settings"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg> 设置</button>
+        <button type="button" class="admin-tab" data-tab="tools"><svg class="icon" aria-hidden="true"><use href="#i-link"/></svg> 快捷工具</button>
+    </div>
+    <div class="admin-toast" id="adminToast" hidden></div>
+    <div class="admin-tab-pages">
+        <div class="admin-tab-page active" id="tab-users"></div>
+        <div class="admin-tab-page" id="tab-groups"></div>
+        <div class="admin-tab-page" id="tab-plugins"></div>
+        <div class="admin-tab-page" id="tab-traffic"></div>
+        <div class="admin-tab-page" id="tab-database"></div>
+        <div class="admin-tab-page" id="tab-settings"></div>
+        <div class="admin-tab-page" id="tab-tools"></div>
+    </div>
+    <div class="admin-footer">
+        <a href="{{ base_path }}/admin?update={{ update }}" target="_blank" rel="noopener">在独立界面中打开 <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+    </div>
+</div>
