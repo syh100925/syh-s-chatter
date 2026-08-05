@@ -3816,10 +3816,6 @@
                     const name = c.querySelector('#txtFileName').value.trim();
                     const content = c.querySelector('#txtFileContent').value;
                     if (!name || !content) return;
-                    if (name.includes('|') || content.includes('|')) {
-                        alert('文件名或内容中不能包含 "|" 字符');
-                        return;
-                    }
                     const blob = new Blob([content], { type: 'text/plain' });
                     const fd = new FormData();
                     fd.append('file', blob, name);
