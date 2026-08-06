@@ -60,6 +60,14 @@ def _permission_matches(rule, permission):
     return False
 
 
+def group_grants(group, permission):
+    """判断权限组是否授予某权限点（含通配符）。"""
+    for rule in _group_permissions(group):
+        if _permission_matches(rule, permission):
+            return True
+    return False
+
+
 def has_permission(username, permission):
     if permission == '*' or username in state.admins:
         return True

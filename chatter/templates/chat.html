@@ -32,8 +32,17 @@
         <div class="tools-card">
             <h3>快捷工具</h3>
             <div class="tools-list">
-                {% for title, url in tool_links %}
-                <a href="{{ url }}" target="_blank" class="tools-link">{{ title }}</a>
+                {% for link in tool_links %}
+                <a href="{{ link.url }}" target="_blank" class="tools-link">
+                    {% if link.icon %}
+                        {% if link.icon.startswith('#') %}
+                        <svg class="tools-icon" aria-hidden="true"><use href="{{ link.icon }}"/></svg>
+                        {% else %}
+                        <span class="tools-icon">{{ link.icon }}</span>
+                        {% endif %}
+                    {% endif %}
+                    {{ link.title }}
+                </a>
                 {% endfor %}
             </div>
             <button class="tools-close" id="toolsCloseBtn">关闭</button>
@@ -68,6 +77,7 @@
         <button type="button" data-action="reply"><svg class="icon" aria-hidden="true"><use href="#i-corner-up-left"/></svg> 回复</button>
         <button type="button" data-action="copy"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg> 复制</button>
         <button type="button" data-action="recall"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> 撤回</button>
+        <button type="button" data-action="md-toggle" id="mdToggleBtn" style="display:none"></button>
     </div>
     <div class="avatar-menu" id="avatarMenu" role="menu">
         <button type="button" data-action="mute" id="avatarMuteBtn"><svg class="icon" aria-hidden="true"><use href="#i-volume-x"/></svg> 禁言</button>
@@ -102,15 +112,6 @@
             <div class="online-status"><span class="online-dot"></span><span class="online-label">在线</span><div class="user-tags" id="userTags"></div></div>
         </div>
 
-        <!-- 管理员面板 -->
-        {% if 'admin.panel' in permissions %}
-        <div class="admin-panel"><p>快捷命令</p><div class="command-buttons">
-            {% if 'chat.clear' in permissions %}<button class="cmd-btn" data-cmd="clear">clear</button>{% endif %}
-            {% if 'chat.change_color' in permissions %}<button class="cmd-btn" data-cmd="change_color [用户名] [颜色]">change_color</button><button class="cmd-btn" data-cmd="change_color 梨岚 #ff0000">梨岚红色</button><button class="cmd-btn" data-cmd="change_color 梨岚 #00ff00">梨岚绿色</button>{% endif %}
-            {% if 'chat.delete' in permissions %}<button class="cmd-btn" data-cmd="delete [数量]">delete</button><button class="cmd-btn" data-cmd="delete 1">delete 1</button><button class="cmd-btn" data-cmd="delete 5">delete 5</button>{% endif %}
-        </div></div>
-        {% endif %}
-
         <!-- 输入区域 -->
         <div id="chat-combined">
             <div class="mute-status" id="muteStatus" aria-live="polite"></div>
@@ -121,7 +122,7 @@
             </div>
             <div class="input-row">
                 <div class="text-field">
-                    <input type="text" name="upload_value" id="upft" placeholder="输入文字...">
+                    <textarea name="upload_value" id="upft" placeholder="输入文字..." rows="1"></textarea>
                     <div class="warning-hint" id="warningHint" style="display:none;"></div>
                     <div class="autocomplete-menu"></div>
                 </div>
@@ -140,6 +141,36 @@
             <div class="filename-hint" id="fileHint"></div>
         </div>
     </div>
+
+    <!-- 快捷指令（聊天窗口右侧列表） -->
+    {% if 'admin.panel' in permissions %}
+    <aside class="cmd-sidebar" id="cmdSidebar">
+        <p>快捷指令</p>
+        <div class="command-buttons">
+            {% if 'chat.clear' in permissions %}<button class="cmd-btn" data-cmd="clear">clear</button>{% endif %}
+            {% if 'chat.change_color' in permissions %}<button class="cmd-btn" data-cmd="change_color [用户名] [颜色]">change_color</button><button class="cmd-btn" data-cmd="change_color 梨岚 #ff0000">梨岚红色</button><button class="cmd-btn" data-cmd="change_color 梨岚 #00ff00">梨岚绿色</button>{% endif %}
+            {% if 'chat.delete' in permissions %}<button class="cmd-btn" data-cmd="delete [数量]">delete</button><button class="cmd-btn" data-cmd="delete 1">delete 1</button><button class="cmd-btn" data-cmd="delete 5">delete 5</button>{% endif %}
+        </div>
+    </aside>
+    {% endif %}
+
+    <!-- 终端反馈区（快捷指令左侧，发送消息时滑出，超时自动缩回） -->
+    <aside class="cmd-terminal" id="cmdTerminal" aria-hidden="true">
+        <div class="term-header">
+            <span class="term-title">终端 · 执行记录</span>
+            <span class="term-controls">
+                <select id="termRetractSel" title="自动缩回时间">
+                    <option value="2000">2s</option>
+                    <option value="3000" selected>3s</option>
+                    <option value="5000">5s</option>
+                    <option value="0">不缩回</option>
+                </select>
+                <button type="button" id="termPinBtn" title="固定面板">固定</button>
+                <button type="button" id="termClearBtn" title="清空记录">清空</button>
+            </span>
+        </div>
+        <div class="term-body" id="termBody"></div>
+    </aside>
 
     <!-- 管理面板内容（按需加载，见 chat.js） -->
     <div id="adminWindowHost" hidden></div>

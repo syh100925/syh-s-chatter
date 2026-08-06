@@ -118,6 +118,14 @@ function can(permission) {
                 const clone = document.body.cloneNode(true);
                 clone.classList.toggle('light-theme', settings.theme === 'light');
                 clone.querySelectorAll('script, .draggable-window, .theme-transition').forEach(n => n.remove());
+                // cloneNode 不复制滚动位置：同步消息区滚动高度，
+                // 否则扩散结束遮罩消失的瞬间，克隆页与真实页滚动位置不一致会跳变
+                const realSd = document.getElementById('sd');
+                const cloneSd = clone.querySelector('#sd');
+                if (realSd && cloneSd) cloneSd.scrollTop = realSd.scrollTop;
+                // 遮罩内克隆体静态展示目标主题：禁用入场动画，避免圆扩散期间
+                // 组件"重绘/重播动画"，遮罩消失时与真实页面无缝衔接
+                clone.querySelectorAll('#chat, .chat-header, .chat-divider, .system-message, .user-info, #chat-combined, .boot-line, .theme-toggle, .appearance-btn, .tools-btn, .admin-entry-btn, #sd, .admin-standalone').forEach(n => { n.style.animation = 'none'; });
                 const mi = clone.querySelector('#modeIndicator');
                 if (mi) mi.textContent = settings.theme === 'light' ? '亮' : '暗';
                 // 2. 遮罩容器承载克隆体，从按钮中心扩散
@@ -185,6 +193,14 @@ function can(permission) {
             function bringWindowToFront(win) {
                 windowZIndex++;
                 win.style.zIndex = windowZIndex;
+            }
+
+            // 聚焦已打开的窗口：置顶 + 高亮动画（与文件窗口一致）
+            function focusWindow(win) {
+                bringWindowToFront(win);
+                win.classList.remove('highlight');
+                void win.offsetWidth;
+                win.classList.add('highlight');
             }
 
             function animateLShapedCorners(win) {
@@ -296,6 +312,7 @@ function can(permission) {
                 win.innerHTML =
                     `<div class="window-titlebar"><span class="window-title">${title}</span><div class="window-actions"><button class="window-btn copy-content-btn" style="display:none;">复制</button><button class="window-btn download-window-btn" style="display:none;">下载</button><button class="window-btn close-window-btn"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></div></div>${showProgress?'<div class="window-progress"><div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div><div class="progress-text">准备下载...</div></div>':''}<div class="window-content">${html}</div>`;
                 document.body.appendChild(win);
+                if (key) openWindows[key] = win;
                 const titlebar = win.querySelector('.window-titlebar');
                 const contentArea = win.querySelector('.window-content');
                 let dragging = false,
@@ -395,7 +412,7 @@ function can(permission) {
 
             document.getElementById('appearanceBtn').addEventListener('click', () => {
                 if (openWindows['settings']) {
-                    bringWindowToFront(openWindows['settings']);
+                    focusWindow(openWindows['settings']);
                     return;
                 }
                 const w = createDraggableWindow('外观设置', '', false, 'settings');
@@ -442,11 +459,7 @@ function can(permission) {
 
             function openFileWindow(url, filename) {
                 if (openWindows[url]) {
-                    const ex = openWindows[url];
-                    bringWindowToFront(ex);
-                    ex.classList.remove('highlight');
-                    void ex.offsetWidth;
-                    ex.classList.add('highlight');
+                    focusWindow(openWindows[url]);
                     return;
                 }
                 if (isImageFile(filename)) {
@@ -565,7 +578,11 @@ function can(permission) {
             //  7. 表情包（原有）
             // ================================================================
             function openEmojiWindow() {
-                const w = createDraggableWindow('我的表情包', '', false);
+                if (openWindows['emoji']) {
+                    focusWindow(openWindows['emoji']);
+                    return;
+                }
+                const w = createDraggableWindow('我的表情包', '', false, 'emoji');
                 w.querySelector('.window-content').innerHTML = '<p style="color:var(--fg-muted);">加载中...</p>';
                 loadEmojiList(w);
             }
@@ -728,7 +745,13 @@ function can(permission) {
             }
 
             const upft = document.getElementById('upft');
-            upft.addEventListener('input', function() { showAutocomplete(this); });
+            function resizeUpft() {
+                if (!upft) return;
+                upft.style.height = 'auto';
+                upft.style.height = Math.min(upft.scrollHeight, 120) + 'px';
+            }
+            upft.addEventListener('input', function() { showAutocomplete(this); resizeUpft(); });
+            resizeUpft();
             upft.addEventListener('keydown', function(e) {
                 if (acMenu.classList.contains('active')) {
                     const items = acMenu.querySelectorAll('.autocomplete-item');
@@ -740,7 +763,7 @@ function can(permission) {
                         e.preventDefault();
                         acIndex = Math.max(acIndex - 1, 0);
                         updateAcSelection(items);
-                    } else if (e.key === 'Enter') {
+                    } else if (e.key === 'Enter' && !e.shiftKey) {
                         if (acIndex >= 0 && items[acIndex]) {
                             e.preventDefault();
                             items[acIndex].click();
@@ -927,17 +950,42 @@ function can(permission) {
             $('#upft').on('input', checkWarning);
 
             function sendTextMessage(text, callback) {
+                termLog('cmd', text);
+                const t0 = performance.now();
                 $.ajax({
                     url: u('/chatts-new?update=') + encodeURIComponent(upd),
                     type: 'POST',
                     data: { upload_value: text, username: currentUser, update: upd, reply_to: pendingReply ? pendingReply.id : '' },
-                    success: function(body) {
+                    success: function(body, status, xhr) {
                         upd = body.update || upd;
+                        const ms = Math.round(performance.now() - t0);
+                        termLog('request', 'POST /chatts-new → ' + (xhr ? xhr.status : 200) + ' OK · ' + ms + 'ms');
+                        const msg = body && body.message;
+                        if (msg && msg.command) {
+                            const name = msg.command.name || '?';
+                            if (msg.command.status === 'executed') {
+                                const resultText = msg.chat || msg.content || '';
+                                termLog('result', '[' + name + '] 执行成功' + (resultText ? ' → ' + resultText : '（无返回结果，已按普通消息发送）'));
+                            } else if (msg.command.status === 'permission_denied') {
+                                termLog('error', '[' + name + '] 权限不足，命令未执行');
+                            } else {
+                                termLog('result', '[' + name + '] 未知命令，已按普通消息发送');
+                            }
+                        } else if (msg) {
+                            termLog('request', '消息内容：' + (msg.chat || msg.content || ''));
+                        }
+                        if (msg) echoSentMessage(msg);
                         $('#upft').val('');
+                        resizeUpft();
                         clearReply();
                         callback(true);
                     },
-                    error: function(xhr) { handleAjaxError(xhr, '文字发送失败'); callback(false); }
+                    error: function(xhr) {
+                        const ms = Math.round(performance.now() - t0);
+                        termLog('error', 'POST /chatts-new → ' + (xhr.status || '网络错误') + ' · ' + ms + 'ms');
+                        handleAjaxError(xhr, '文字发送失败');
+                        callback(false);
+                    }
                 });
             }
 
@@ -965,6 +1013,7 @@ function can(permission) {
                                 upd = body.update || upd;
                                 fileInput.value = '';
                                 document.getElementById('fileHint').textContent = '';
+                                if (body && body.message) echoSentMessage(body.message);
                                 done(true);
                             },
                             error: function(xhr) { handleAjaxError(xhr, '文件上传失败'); done(false); }
@@ -982,7 +1031,7 @@ function can(permission) {
                     });
                 });
                 $('#upft').on('keydown', function(e) {
-                    if (e.key === 'Enter' && !acMenu.classList.contains('active')) {
+                    if (e.key === 'Enter' && !e.shiftKey && !acMenu.classList.contains('active')) {
                         e.preventDefault();
                         sendBtn.click();
                     }
@@ -991,6 +1040,84 @@ function can(permission) {
             $(document).on('click', '.cmd-btn', function() {
                 $('#upft').val('command: ' + $(this).data('cmd')).focus();
             });
+
+            // ================================================================
+            //  终端反馈区（快捷指令左侧；发送消息时滑出，超时自动缩回）
+            // ================================================================
+            const termPanel = document.getElementById('cmdTerminal');
+            const termBody = document.getElementById('termBody');
+            const termRetractSel = document.getElementById('termRetractSel');
+            const termPinBtn = document.getElementById('termPinBtn');
+            const termClearBtn = document.getElementById('termClearBtn');
+            let termPinned = false;
+            let termTimer = null;
+
+            function termTime() {
+                const d = new Date();
+                const p = function (n) { return (n < 10 ? '0' : '') + n; };
+                return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+            }
+
+            function termLog(type, text) {
+                if (!termBody) return;
+                const line = document.createElement('div');
+                line.className = 'term-line term-' + type;
+                const time = document.createElement('span');
+                time.className = 'term-time';
+                time.textContent = termTime();
+                const content = document.createElement('span');
+                content.className = 'term-text';
+                content.textContent = text;
+                line.appendChild(time);
+                line.appendChild(content);
+                termBody.appendChild(line);
+                while (termBody.children.length > 200) termBody.removeChild(termBody.firstChild);
+                termBody.scrollTop = termBody.scrollHeight;
+                termActivity();
+            }
+
+            function termActivity() {
+                if (!termPanel) return;
+                termPanel.classList.add('active');
+                termPanel.setAttribute('aria-hidden', 'false');
+                clearTimeout(termTimer);
+                const delay = parseInt(termRetractSel ? termRetractSel.value : '3000', 10) || 0;
+                if (!termPinned && delay > 0) termTimer = setTimeout(termHide, delay);
+            }
+
+            function termHide() {
+                if (!termPanel || termPinned) return;
+                termPanel.classList.remove('active');
+                termPanel.setAttribute('aria-hidden', 'true');
+            }
+
+            if (termPanel) {
+                try {
+                    const savedRetract = localStorage.getItem('termRetract');
+                    if (savedRetract !== null && termRetractSel) termRetractSel.value = savedRetract;
+                } catch (e) {}
+                if (termRetractSel) {
+                    termRetractSel.addEventListener('change', function () {
+                        try { localStorage.setItem('termRetract', termRetractSel.value); } catch (e) {}
+                        if (termPanel.classList.contains('active')) termActivity();
+                    });
+                }
+                if (termPinBtn) {
+                    termPinBtn.addEventListener('click', function () {
+                        termPinned = !termPinned;
+                        termPinBtn.textContent = termPinned ? '取消固定' : '固定';
+                        termPinBtn.classList.toggle('active', termPinned);
+                        if (termPinned) clearTimeout(termTimer);
+                        else if (termPanel.classList.contains('active')) termActivity();
+                    });
+                }
+                if (termClearBtn) {
+                    termClearBtn.addEventListener('click', function () {
+                        termBody.innerHTML = '';
+                        termActivity();
+                    });
+                }
+            }
             const sessionAlert = document.getElementById('sessionAlert');
             document.getElementById('alertConfirmBtn').addEventListener('click', () => window.location.replace(BASE_PATH + '/'));
 
@@ -1039,7 +1166,14 @@ function can(permission) {
                 if (sy) return `${(msgD.getUTCMonth()+1).toString().padStart(2,'0')}-${msgD.getUTCDate().toString().padStart(2,'0')} ${h}:${m}`;
                 return `${msgD.getUTCFullYear()}-${(msgD.getUTCMonth()+1).toString().padStart(2,'0')}-${msgD.getUTCDate().toString().padStart(2,'0')} ${h}:${m}`;
             }
-            const TIME_THRESHOLD = 1800;
+            const TIME_THRESHOLD = 300;
+
+            // 统一把消息时间换算成毫秒：服务器 timestamp 为秒，历史解析为毫秒
+            function messageMs(message) {
+                let ts = Number(message.timestamp);
+                if (!ts) ts = parseTimeToTimestamp(message.time) || 0;
+                return ts > 1e11 ? ts : ts * 1000;
+            }
 
             function isResponseValid(text) {
                 if (!text) return false;
@@ -1053,6 +1187,12 @@ function can(permission) {
             let selectMode = false;
             let selectedIds = new Set(); // 存储选中消息的 id
             const messageCache = new Map();
+
+            // ---- 消息分段渲染状态 ----
+            const SEGMENT_SIZE = 200;     // 每次渲染的最大消息条数
+            let windowStart = 0;          // 当前渲染的第一条消息在 payload.messages 中的下标
+            let loadMoreInFlight = false; // 防止连点重复加载
+            let suppressStickNextRender = false;
 
             // ---- 获取消息的唯一 ID ----
             function getMsgId(user, content, time) {
@@ -1223,6 +1363,20 @@ function can(permission) {
                 appendMentionText(parent, raw.slice(cursor), isOwn);
             }
 
+            // 插件渲染钩子：__chatterRenderHooks 数组由插件 JS 在 chat.js 之前注册，
+            // 钩子签名 (bubble, message, payload)，返回 true 表示已接管气泡内容
+            function callRenderHooks(bubble, message, payload) {
+                const hooks = window.__chatterRenderHooks;
+                if (!Array.isArray(hooks) || hooks.length === 0) return false;
+                let handled = false;
+                for (let i = 0; i < hooks.length; i++) {
+                    try {
+                        if (hooks[i](bubble, message, payload) === true) handled = true;
+                    } catch (_) {}
+                }
+                return handled;
+            }
+
             function isLikelyImageUrl(value) {
                 try {
                     const url = new URL(value);
@@ -1324,6 +1478,29 @@ function can(permission) {
                 });
             }
 
+            // #sd 设置了 scroll-behavior: smooth，直接赋 scrollTop 会动画滚动；
+            // 若期间被重渲染打断则停在半路且不再重试。这里临时关闭平滑做瞬时定位。
+            function setScrollTopInstant(scroll, top) {
+                const prev = scroll.style.scrollBehavior;
+                scroll.style.scrollBehavior = 'auto';
+                scroll.scrollTop = top;
+                scroll.style.scrollBehavior = prev;
+            }
+
+            function loadMoreMessages() {
+                if (loadMoreInFlight || windowStart <= 0 || !last_result) return;
+                loadMoreInFlight = true;
+                try {
+                    const payload = normalizePayload(last_result);
+                    if (!payload) return;
+                    windowStart = Math.max(0, windowStart - SEGMENT_SIZE);
+                    suppressStickNextRender = true;
+                    renderMessages(payload);
+                } finally {
+                    loadMoreInFlight = false;
+                }
+            }
+
             function renderMessages(result) {
                 const payload = normalizePayload(result);
                 if (!payload) return;
@@ -1331,12 +1508,34 @@ function can(permission) {
                 payload.messages.forEach(message => messageCache.set(message.id, message));
                 const list = document.getElementById('message-list');
                 const scroll = document.getElementById('sd');
-                const shouldStick = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 100;
+                const prevScrollHeight = scroll.scrollHeight;
+                const prevScrollTop = scroll.scrollTop;
+                const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 100;
+                const shouldStick = !suppressStickNextRender && atBottom;
+                suppressStickNextRender = false;
+                const total = payload.messages.length;
+                if (shouldStick) {
+                    windowStart = Math.max(0, total - SEGMENT_SIZE);
+                } else {
+                    windowStart = Math.min(windowStart, Math.max(0, total - SEGMENT_SIZE));
+                }
                 list.replaceChildren();
+                if (windowStart > 0) {
+                    const sentinelLi = document.createElement('li');
+                    sentinelLi.className = 'load-more-row';
+                    const loadBtn = document.createElement('button');
+                    loadBtn.type = 'button';
+                    loadBtn.className = 'load-more-btn';
+                    loadBtn.textContent = '加载更早的消息（还有 ' + windowStart + ' 条）';
+                    loadBtn.addEventListener('click', loadMoreMessages);
+                    sentinelLi.appendChild(loadBtn);
+                    list.appendChild(sentinelLi);
+                }
                 let lastTimestamp = null;
-                payload.messages.forEach(message => {
-                    const timestamp = message.timestamp || parseTimeToTimestamp(message.time);
-                    if (lastTimestamp !== null && timestamp && (timestamp - lastTimestamp) / 1000 > TIME_THRESHOLD) {
+                const windowMessages = payload.messages.slice(windowStart);
+                windowMessages.forEach((message, index) => {
+                    const timestamp = messageMs(message);
+                    if (timestamp && (index === 0 || (lastTimestamp !== null && (timestamp - lastTimestamp) / 1000 > TIME_THRESHOLD))) {
                         const separator = document.createElement('li');
                         separator.className = 'time-separator';
                         const separatorText = document.createElement('span');
@@ -1380,7 +1579,7 @@ function can(permission) {
                         bubble.textContent = '消息已撤回';
                     } else if (['file', 'image', 'audio', 'emoji'].includes(message.type)) {
                         appendAttachment(bubble, message);
-                    } else {
+                    } else if (!callRenderHooks(bubble, message, payload)) {
                         appendRichText(bubble, message.content, isOwn);
                     }
                     content.appendChild(bubble);
@@ -1392,12 +1591,6 @@ function can(permission) {
                         reference.dataset.target = message.reply_to;
                         reference.textContent = target ? '回复 ' + target.user + ': ' + messageSummary(target) : '回复的消息已不存在';
                         content.appendChild(reference);
-                    }
-                    if (message.time) {
-                        const timeText = document.createElement('div');
-                        timeText.className = 'message-time';
-                        timeText.textContent = message.time;
-                        content.appendChild(timeText);
                     }
                     if (selectMode) {
                         const checkboxWrap = document.createElement('div');
@@ -1423,7 +1616,30 @@ function can(permission) {
                 });
                 bindMessageLinks();
                 updateSelectedCount();
-                if (shouldStick) scroll.scrollTop = scroll.scrollHeight;
+                if (shouldStick) {
+                    setScrollTopInstant(scroll, scroll.scrollHeight);
+                    // 图片/字体/时间分隔线等异步内容加载会使列表增高；
+                    // 阈值过大（200px）会在底部留下几十像素缝隙，且后续轮询不再判定为贴底，收紧为 4px
+                    requestAnimationFrame(() => {
+                        if (scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight > 4) {
+                            setScrollTopInstant(scroll, scroll.scrollHeight);
+                        }
+                    });
+                } else {
+                    setScrollTopInstant(scroll, prevScrollTop + (scroll.scrollHeight - prevScrollHeight));
+                }
+            }
+
+            // 发送成功后实时回显到聊天列表（无需等下一次轮询）
+            function echoSentMessage(message) {
+                if (!message || !message.id) return;
+                const existing = last_result && (last_result.messages || []).some(m => m.id === message.id);
+                if (existing) return;
+                messageCache.set(message.id, message);
+                const payload = last_result
+                    ? Object.assign({}, last_result, { messages: (last_result.messages || []).concat([message]) })
+                    : { messages: [message] };
+                renderMessages(payload);
             }
 
             // ---- 更新函数：JSON 协议，保留旧四行响应的兼容解析 ----
@@ -1500,6 +1716,7 @@ function can(permission) {
 
             let contextMessage = null;
             let contextUser = null;
+            let contextMdAction = null;
             let dialogCallback = null;
 
             function openActionDialog(title, message, callback) {
@@ -1567,7 +1784,29 @@ function can(permission) {
                 const menu = document.getElementById('messageMenu');
                 const recallButton = menu.querySelector('[data-action="recall"]');
                 recallButton.style.display = can('message.recall.any') || message.user === currentUser ? 'block' : 'none';
+                // 插件菜单项：markdown 插件提供「显示原文/显示Markdown」切换
+                const mdButton = menu.querySelector('[data-action="md-toggle"]');
+                const pluginEntry = pluginMessageMenuEntry(message);
+                contextMdAction = pluginEntry ? pluginEntry.action : null;
+                if (mdButton) {
+                    mdButton.style.display = pluginEntry ? 'block' : 'none';
+                    if (pluginEntry) mdButton.textContent = pluginEntry.label;
+                }
                 positionActionMenu(menu, x, y);
+            }
+
+            // 插件可在 window.__chatterMessageMenu 注册菜单项提供器：
+            // 函数签名 (message) => { label, action } | null
+            function pluginMessageMenuEntry(message) {
+                const providers = window.__chatterMessageMenu;
+                if (!Array.isArray(providers) || providers.length === 0) return null;
+                for (let i = 0; i < providers.length; i++) {
+                    try {
+                        const entry = providers[i](message);
+                        if (entry) return entry;
+                    } catch (_) {}
+                }
+                return null;
             }
 
             function openAvatarMenu(username, x, y) {
@@ -1593,6 +1832,10 @@ function can(permission) {
                     hideActionMenus();
                 } else if (action === 'recall') {
                     recallContextMessage();
+                } else if (action === 'md-toggle') {
+                    const mdAction = contextMdAction;
+                    hideActionMenus();
+                    if (mdAction) mdAction();
                 }
             });
 
@@ -1857,7 +2100,11 @@ function can(permission) {
             if (textFileSendBtn) textFileSendBtn.addEventListener('click', openTextFileSendWindow);
 
             function openTextFileSendWindow() {
-                const w = createDraggableWindow('发送文本文件', '', false);
+                if (openWindows['textfile-send']) {
+                    focusWindow(openWindows['textfile-send']);
+                    return;
+                }
+                const w = createDraggableWindow('发送文本文件', '', false, 'textfile-send');
                 const c = w.querySelector('.window-content');
                 c.innerHTML =
                     `<div style="display:flex; flex-direction:column; gap:12px;"><input type="text" id="txtFileName" placeholder="文件名（含后缀）" style="background:transparent; border:1px solid var(--border-color); padding:8px; color:var(--fg-primary);"><textarea id="txtFileContent" rows="8" placeholder="文件内容..." style="background:transparent; border:1px solid var(--border-color); padding:8px; color:var(--fg-primary); resize:vertical;"></textarea><button id="txtSendBtn" style="background:transparent; border:2px solid var(--border-color); color:var(--fg-primary); padding:8px; cursor:pointer;">发送</button></div>`;
@@ -1894,11 +2141,11 @@ function can(permission) {
 
             function openAdminPanel() {
                 if (openWindows['admin']) {
-                    bringWindowToFront(openWindows['admin']);
+                    focusWindow(openWindows['admin']);
                     return;
                 }
                 const w = createDraggableWindow('<svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> 管理面板', '<div class="admin-loading">加载中...</div>', false, 'admin');
-                w.style.width = '740px';
+                w.style.width = '900px';
                 const c = w.querySelector('.window-content');
                 fetch(u('/admin/content?update=') + encodeURIComponent(upd))
                     .then(r => {

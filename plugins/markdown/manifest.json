@@ -1,0 +1,7 @@
+{
+  "name": "markdown",
+  "version": "1.0.0",
+  "author": "syh",
+  "description": "聊天消息 Markdown 渲染：标题、列表、表格、引用、代码高亮；代码块一键复制与智能格式化（统一缩进与空格，Tab=4，可开关），超过 10 行的代码块默认折叠；右键菜单可切换「显示原文」。",
+  "entry": "main.py"
+}

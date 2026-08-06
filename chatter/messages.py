@@ -175,9 +175,14 @@ def add_chat(username, value, d_time=None, reply_to=None, message_type=None, che
 
     if value.startswith('command: '):
         from . import commands  # 延迟导入，避免循环依赖
-        result = commands.dispatch(username, value, d_time)
-        if result is not None:
+        info = commands.resolve(username, value, d_time)
+        if info['status'] == 'executed' and info['message'] is not None:
+            result = info['message']
+            result['command'] = {'name': info['name'], 'status': 'executed'}
             return result
+        command_info = {'name': info['name'], 'status': info['status']}
+    else:
+        command_info = None
 
     if reply_to and not find_message(reply_to):
         reply_to = None
@@ -197,7 +202,10 @@ def add_chat(username, value, d_time=None, reply_to=None, message_type=None, che
     if not plugin_manager.emit('message_send', document=document, username=username):
         return None  # 被插件拦截
     state.database.insert_one(document)
-    return serialize_message(document)
+    message = serialize_message(document)
+    if command_info:
+        message['command'] = command_info
+    return message
 
 
 # ---------------- 撤回 ----------------

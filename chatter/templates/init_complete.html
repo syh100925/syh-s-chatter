@@ -299,7 +299,7 @@
         </div>
 
         <div class="info-line">
-            管理员 <strong>{{ admin_user }}</strong> &nbsp;·&nbsp; 数据库 <strong>{{ db_ip }}</strong> &nbsp;·&nbsp; 服务器 <strong>{{ server_ip }}</strong>
+            管理员 <strong>{{ admin_user }}</strong> &nbsp;·&nbsp; 数据库 <strong>{{ db_ip }}</strong> &nbsp;·&nbsp; 服务器 <strong>{{ server_ip }}</strong> &nbsp;·&nbsp; 端口 <strong>{{ saved_port }}</strong>
         </div>
 
         <div class="codes-section">
@@ -324,8 +324,8 @@
 
         {% if restart_required %}
         <div class="info-line" style="color: #ffaa00;">
-            前缀已保存为 <strong>{{ saved_base_path or '/' }}</strong>，需<b>重启服务</b>后生效；
-            重启前请继续使用当前地址访问。
+            配置已保存（前缀：<strong>{{ saved_base_path or '/' }}</strong>，端口：<strong>{{ saved_port }}</strong>），
+            需<b>重启服务</b>后生效；重启前请继续使用当前地址访问。
         </div>
         {% endif %}
 

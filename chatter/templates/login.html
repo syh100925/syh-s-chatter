@@ -105,6 +105,29 @@
             }
         }
 
+        /* ========== 主题切换 - 圆圈扩散动画（与聊天页同款） ========== */
+        .theme-transition {
+            position: fixed;
+            inset: 0;
+            z-index: 2147483000;
+            pointer-events: none;
+            animation: themeReveal 0.5s ease-out forwards;
+        }
+        @keyframes themeReveal {
+            from {
+                clip-path: circle(0px at var(--tx, 50%) var(--ty, 50%));
+            }
+            to {
+                clip-path: circle(150vmax at var(--tx, 50%) var(--ty, 50%));
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .theme-transition {
+                animation: none;
+                opacity: 0;
+            }
+        }
+
         /* ========== 主容器 ========== */
         .login-container {
             width: 100%;
@@ -347,9 +370,26 @@
             setThemeUI(false);
         }
 
+        function startThemeTransition() {
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            const rect = themeToggle.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const overlay = document.createElement('div');
+            overlay.className = 'theme-transition';
+            overlay.style.setProperty('--tx', cx + 'px');
+            overlay.style.setProperty('--ty', cy + 'px');
+            document.body.appendChild(overlay);
+            const remove = function () { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
+            overlay.addEventListener('animationend', remove, { once: true });
+            overlay.addEventListener('animationcancel', remove, { once: true });
+            setTimeout(remove, 600);
+        }
+
         themeToggle.addEventListener('click', () => {
             const isLight = !document.body.classList.contains('light-theme');
             setThemeUI(isLight);
+            startThemeTransition();
         });
     </script>
 

@@ -90,9 +90,12 @@
     function loadUsers() {
         const el = page('users');
         Promise.all([api('/admin/api/users'), api('/admin/api/groups')]).then(function (results) {
-            const users = results[0].users;
+            const userData = results[0];
+            const users = userData.users;
             const groups = results[1].groups;
             const defaultGroup = results[1].default_group;
+            const actor = userData.actor;
+            const initialAdmin = userData.initial_admin;
             let html =
                 '<div class="admin-toolbar"><span>共 ' + users.length + ' 名用户</span>' +
                 '<span class="admin-toolbar-right"><input type="number" id="inviteCount" value="1" min="1" max="50" class="admin-input admin-input-sm">' +
@@ -100,16 +103,23 @@
                 '<div id="inviteResult"></div>';
             html += '<table class="admin-table"><thead><tr><th>用户名</th><th>颜色</th><th>权限组</th><th>管理</th><th>操作</th></tr></thead><tbody>';
             users.forEach(function (u) {
+                const isSelf = u.username === actor;
+                const isInitial = u.username === initialAdmin;
+                const protectedRow = isSelf || isInitial || u.is_admin;
+                const badges = (isInitial ? '<span class="admin-badge admin-badge-initial">初始管理员</span>' : '') +
+                    (isSelf ? '<span class="admin-badge admin-badge-self">我</span>' : '');
                 html += '<tr>' +
-                    '<td>' + esc(u.username) + '</td>' +
+                    '<td>' + esc(u.username) + badges + '</td>' +
                     '<td><input type="color" class="admin-color" data-user="' + esc(u.username) + '" value="' + esc(u.color) + '"></td>' +
-                    '<td><select class="admin-group-sel" data-user="' + esc(u.username) + '">' + groupOptions(groups, u.group) + '</select>' +
+                    '<td><select class="admin-group-sel" data-user="' + esc(u.username) + '"' + (protectedRow ? ' disabled' : '') + '>' + groupOptions(groups, u.group) + '</select>' +
                     (u.group === defaultGroup ? '<div class="admin-hint">默认组</div>' : '') + '</td>' +
                     '<td>' + (u.is_admin ? '<svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>' : '') + '</td>' +
                     '<td class="admin-ops">' +
-                    '<button class="admin-btn admin-btn-sm" data-act="rename" data-user="' + esc(u.username) + '">改名</button> ' +
+                    '<button class="admin-btn admin-btn-sm" data-act="rename" data-user="' + esc(u.username) + '"' + (isSelf ? ' disabled' : '') + '>改名</button> ' +
                     '<button class="admin-btn admin-btn-sm" data-act="password" data-user="' + esc(u.username) + '">密码</button> ' +
-                    '<button class="admin-btn admin-btn-sm admin-btn-danger" data-act="delete" data-user="' + esc(u.username) + '">删除</button>' +
+                    (protectedRow
+                        ? '<span class="admin-hint admin-protected">受保护</span>'
+                        : '<button class="admin-btn admin-btn-sm admin-btn-danger" data-act="delete" data-user="' + esc(u.username) + '">删除</button>') +
                     '</td></tr>';
             });
             html += '</tbody></table>';
@@ -264,7 +274,9 @@
                     '<td>' + esc(p.author) + '</td>' +
                     '<td class="admin-desc">' + esc(p.description) + '</td>' +
                     '<td><input type="checkbox" class="admin-toggle" data-plugin="' + esc(p.name) + '"' + (p.enabled ? ' checked' : '') + '></td>' +
-                    '<td class="admin-ops">' + (p.has_config && p.loaded ?
+                    '<td class="admin-ops">' + (p.loaded ?
+                        '<button class="admin-btn admin-btn-sm" data-reload="' + esc(p.name) + '">重载</button> ' : '') +
+                    (p.has_config && p.loaded ?
                         '<button class="admin-btn admin-btn-sm" data-conf="' + esc(p.name) + '">配置</button> ' : '') +
                     '</td></tr>';
             });
@@ -282,8 +294,17 @@
                 box.addEventListener('change', function () {
                     const name = box.getAttribute('data-plugin');
                     api('/admin/api/plugins/' + encodeURIComponent(name) + '/toggle', 'POST', { enabled: box.checked })
-                        .then(function () { toast((box.checked ? '已启用 ' : '已禁用 ') + name); })
+                        .then(function () { toast((box.checked ? '已启用 ' : '已禁用 ') + name); loadPlugins(); })
                         .catch(function (err) { toast(err.message, true); box.checked = !box.checked; });
+                });
+            });
+
+            el.querySelectorAll('[data-reload]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const name = btn.getAttribute('data-reload');
+                    api('/admin/api/plugins/' + encodeURIComponent(name) + '/reload', 'POST')
+                        .then(function () { toast('已热重载 ' + name); loadPlugins(); })
+                        .catch(function (err) { toast(err.message, true); });
                 });
             });
 
@@ -451,39 +472,56 @@
         const el = page('tools');
         api('/admin/api/tool-links').then(function (data) {
             const links = data.links || [];
-            let html = '<div class="admin-toolbar"><span>聊天室"工具集"弹窗中的自定义链接（' + links.length + ' 条，与插件提供的链接一起展示）</span>' +
+            const removedKeys = [];
+            let html = '<div class="admin-toolbar"><span>聊天室"工具集"弹窗中的链接（' + links.length + ' 条，含插件提供的链接；可编辑 / 禁用 / 排序 / 删除。地址以 / 开头表示根路径，如 /about，不再自动追加 base_path）</span>' +
                 '<span class="admin-toolbar-right"><button class="admin-btn" id="addToolLinkBtn">+ 添加链接</button> ' +
                 '<button class="admin-btn admin-btn-primary" id="saveToolLinksBtn">保存</button></span></div>';
             html += '<div id="toolLinksList" class="admin-tool-links">';
-            links.forEach(function (link, index) {
-                html += toolLinkRow(index, link.title, link.url);
+            links.forEach(function (link) {
+                html += toolLinkRow(link);
             });
             html += '</div>';
             el.innerHTML = html;
 
-            function toolLinkRow(index, title, url) {
-                return '<div class="admin-tool-link-row" data-index="' + index + '">' +
-                    '<input type="text" class="admin-input admin-input-title" placeholder="链接名称" value="' + esc(title) + '">' +
-                    '<input type="text" class="admin-input admin-input-url" placeholder="https://... 或以 / 开头的站内路径" value="' + esc(url) + '">' +
+            function toolLinkRow(link) {
+                const isPlugin = !!(link.plugin && link.key);
+                return '<div class="admin-tool-link-row' + (isPlugin ? ' is-plugin' : '') + '"' +
+                    (isPlugin ? ' data-plugin="' + esc(link.plugin) + '" data-key="' + esc(link.key) + '"' : '') + '>' +
+                    '<span class="admin-tool-drag-icon" draggable="true" title="拖拽排序">⠿</span>' +
+                    '<input type="checkbox" class="admin-tool-enabled" title="是否在弹窗中显示"' + (link.enabled !== false ? ' checked' : '') + '>' +
+                    '<input type="text" class="admin-input admin-input-icon" placeholder="图标" value="' + esc(link.icon || '') + '" title="emoji 或 #i-symbol（点 ▦ 从图标库选择）">' +
+                    '<button type="button" class="admin-btn admin-btn-sm tool-icon-picker" title="从 SVG 图标库选择">▦</button>' +
+                    '<input type="text" class="admin-input admin-input-title" placeholder="链接名称" value="' + esc(link.title || '') + '">' +
+                    '<input type="text" class="admin-input admin-input-url" placeholder="https://... 或 /xxx（根路径）" value="' + esc(link.url || '') + '">' +
+                    (isPlugin ? '<span class="admin-tool-badge" title="由插件提供">' + esc(link.plugin) + '</span>' : '') +
                     '<button class="admin-btn admin-btn-sm admin-btn-danger tool-link-del">删除</button></div>';
             }
 
             function collect() {
                 return Array.prototype.map.call(el.querySelectorAll('.admin-tool-link-row'), function (row) {
-                    return {
+                    const link = {
                         title: row.querySelector('.admin-input-title').value.trim(),
                         url: row.querySelector('.admin-input-url').value.trim(),
+                        icon: row.querySelector('.admin-input-icon').value.trim(),
+                        enabled: row.querySelector('.admin-tool-enabled').checked,
                     };
+                    const key = row.getAttribute('data-key');
+                    const plugin = row.getAttribute('data-plugin');
+                    if (key && plugin) {
+                        link.key = key;
+                        link.plugin = plugin;
+                    }
+                    return link;
                 }).filter(function (link) { return link.title && link.url; });
             }
 
             el.querySelector('#addToolLinkBtn').addEventListener('click', function () {
                 const list = el.querySelector('#toolLinksList');
-                list.insertAdjacentHTML('beforeend', toolLinkRow(list.children.length, '', ''));
+                list.insertAdjacentHTML('beforeend', toolLinkRow({}));
             });
 
             el.querySelector('#saveToolLinksBtn').addEventListener('click', function () {
-                api('/admin/api/tool-links', 'POST', { links: collect() })
+                api('/admin/api/tool-links', 'POST', { links: collect(), removed: removedKeys })
                     .then(function () { toast('快捷工具链接已保存'); loadTools(); })
                     .catch(function (err) { toast(err.message, true); });
             });
@@ -491,8 +529,83 @@
             el.querySelectorAll('.tool-link-del').forEach(function (btn) {
                 btn.addEventListener('click', function () {
                     const row = btn.closest('.admin-tool-link-row');
-                    if (row) row.remove();
+                    if (!row) return;
+                    const key = row.getAttribute('data-key');
+                    if (key) removedKeys.push(key);
+                    row.remove();
                 });
+            });
+
+            // SVG 图标选择器：弹出 sprite 中全部 #i-* 图标的网格
+            el.querySelectorAll('.tool-icon-picker').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const input = btn.closest('.admin-tool-link-row').querySelector('.admin-input-icon');
+                    openIconPicker(input);
+                });
+            });
+            function openIconPicker(input) {
+                let overlay = document.getElementById('toolIconPicker');
+                if (overlay) overlay.remove();
+                overlay = document.createElement('div');
+                overlay.id = 'toolIconPicker';
+                overlay.className = 'tool-icon-picker-overlay';
+                const icons = Array.prototype.map.call(
+                    document.querySelectorAll('svg use'), function (use) {
+                        return use.getAttribute('href') || '';
+                    }).filter(function (h) { return h && h.indexOf('#i-') === 0; });
+                const seen = [];
+                const uniq = icons.filter(function (h) { if (seen.indexOf(h) !== -1) return false; seen.push(h); return true; });
+                let grid = '';
+                uniq.forEach(function (href) {
+                    grid += '<button type="button" class="tool-icon-opt" data-href="' + href + '" title="' + href.slice(1) + '">' +
+                        '<svg class="icon" aria-hidden="true"><use href="' + href + '"/></svg></button>';
+                });
+                overlay.innerHTML = '<div class="tool-icon-picker-panel"><div class="tool-icon-picker-head">选择 SVG 图标' +
+                    '<button type="button" class="tool-icon-picker-clear" title="清空图标">清空</button>' +
+                    '<button type="button" class="tool-icon-picker-close" title="关闭">✕</button></div>' +
+                    '<div class="tool-icon-picker-grid">' + grid + '</div></div>';
+                document.body.appendChild(overlay);
+                const close = function () { overlay.remove(); };
+                overlay.addEventListener('click', function (e) {
+                    if (e.target === overlay || e.target.closest('.tool-icon-picker-close')) return close();
+                    const opt = e.target.closest('.tool-icon-opt');
+                    if (!opt) return;
+                    input.value = opt.getAttribute('data-href');
+                    close();
+                });
+                overlay.querySelector('.tool-icon-picker-clear').addEventListener('click', function () {
+                    input.value = '';
+                    close();
+                });
+            }
+
+            // 拖拽排序（HTML5 drag/drop，把手拖动）
+            const list = el.querySelector('#toolLinksList');
+            let dragRow = null;
+            list.addEventListener('dragstart', function (e) {
+                if (!e.target.closest('.admin-tool-drag-icon')) return;
+                dragRow = e.target.closest('.admin-tool-link-row');
+                e.dataTransfer.effectAllowed = 'move';
+                dragRow.classList.add('admin-tool-dragging');
+            });
+            list.addEventListener('dragover', function (e) {
+                if (!dragRow) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+            list.addEventListener('drop', function (e) {
+                e.preventDefault();
+                if (!dragRow) return;
+                const target = e.target.closest('.admin-tool-link-row');
+                if (target && target !== dragRow) {
+                    list.insertBefore(dragRow, target.nextSibling);
+                }
+                dragRow.classList.remove('admin-tool-dragging');
+                dragRow = null;
+            });
+            list.addEventListener('dragend', function () {
+                if (dragRow) dragRow.classList.remove('admin-tool-dragging');
+                dragRow = null;
             });
         }).catch(function (err) {
             el.innerHTML = '<div class="admin-error">加载失败：' + esc(err.message) + '</div>';

@@ -41,6 +41,7 @@ def init_page():
                                db_pass=cfg.get('db_pass', ''),
                                server_ip=cfg.get('server_ip', ''),
                                base_path_value=state.base_path,
+                               port=cfg.get('port', 5000),
                                admin_user='admin',
                                error=None)
 
@@ -50,7 +51,8 @@ def init_page():
     db_user = request.form.get('db_user', '').strip()
     db_pass = request.form.get('db_pass', '').strip()
     new_server_ip = request.form.get('server_ip', '').strip()
-    new_base_path = (request.form.get('base_path', '').strip().rstrip('/'))
+    new_base_path = config.normalize_base_path(request.form.get('base_path'))
+    new_port = request.form.get('port', '5000').strip()
     admin_user = request.form.get('admin_user', '').strip()
     admin_pass = request.form.get('admin_pass', '').strip()
     admin_pass_confirm = request.form.get('admin_pass_confirm', '').strip()
@@ -60,6 +62,7 @@ def init_page():
         return render_template('init.html', error=error_message,
                                db_ip=db_ip, db_port=db_port, db_user=db_user, db_pass=db_pass,
                                server_ip=new_server_ip, base_path_value=new_base_path,
+                               port=new_port,
                                admin_user=admin_user, invite_count=invite_count)
 
     # 基本验证
@@ -67,6 +70,12 @@ def init_page():
         return re_render('所有必填字段不能为空')
     if admin_pass != admin_pass_confirm:
         return re_render('管理员密码不一致')
+    try:
+        new_port = int(new_port)
+        if not 1 <= new_port <= 65535:
+            return re_render('端口必须在 1-65535 之间')
+    except ValueError:
+        return re_render('端口必须是数字')
     try:
         invite_count = int(invite_count)
         if invite_count < 1:
@@ -76,6 +85,7 @@ def init_page():
 
     # 保存配置（包含管理员列表与管理员的 admin 权限组）
     old_base_path = state.base_path  # 当前实际挂载前缀（前缀变更前重启无效）
+    old_port = state.settings.get('port', 5000)
     new_config = config.load_config()
     new_config.update({
         'db_ip': db_ip,
@@ -84,7 +94,9 @@ def init_page():
         'db_pass': db_pass,
         'server_ip': new_server_ip,
         'base_path': new_base_path,
+        'port': new_port,
         'admins': [admin_user],
+        'initial_admin': admin_user,
     })
     user_groups = dict(new_config.get('user_groups') or {})
     user_groups[admin_user] = 'admin'
@@ -124,7 +136,8 @@ def init_page():
                            server_ip=new_server_ip,
                            live_base_path=old_base_path,
                            saved_base_path=new_base_path,
-                           restart_required=(new_base_path != old_base_path))
+                           saved_port=new_port,
+                           restart_required=(new_base_path != old_base_path or new_port != old_port))
 
 
 @bp.route('/init/ping', methods=['POST'])

@@ -13,8 +13,8 @@
 - login(username) / logout(username) / register(username)
 - message_recall(message_id, username)
 
-注意：注册蓝图/路由的插件，启用状态变化需重启服务生效；
-CSS/JS 注入、命令与钩子即时生效。
+注意：启用/禁用/重载在运行中即时生效（命令、钩子、CSS/JS 注入、快捷工具链接）；
+已注册的蓝图路由因 Flask 限制无法注销，含新蓝图注册的变更需重启服务生效。
 """
 import importlib.util
 import json
@@ -61,6 +61,7 @@ class PluginContext:
         self._css = []
         self._js = []
         self._tool_links = []
+        self._module_name = None  # sys.modules 中的模块名（停止时清理）
 
     # ---------------- 注册接口 ----------------
 
@@ -179,6 +180,7 @@ def load_plugin(plugin):
             if isinstance(module_info, dict):
                 info.update(module_info)
         ctx = PluginContext(info.get('name', plugin['name']), module, plugin['dir'], info)
+        ctx._module_name = module.__name__
         ctx.enabled = is_enabled(ctx.name)
         on_load = getattr(module, 'on_load', None)
         if on_load:
@@ -194,8 +196,46 @@ def is_enabled(name):
     return states.get(name, True)
 
 
+def _register_blueprint(app, blueprint, url_prefix, ctx_name):
+    """注册插件蓝图；热重载导致同名蓝图已注册时，换唯一名重试。"""
+    try:
+        app.register_blueprint(blueprint, url_prefix=url_prefix)
+        return True
+    except ValueError:
+        pass  # 同名蓝图已注册（热重载/热启动时），进入重试
+    blueprint.name = '%s_r%d' % (blueprint.name, 2)
+    try:
+        app.register_blueprint(blueprint, url_prefix=url_prefix)
+        return True
+    except (AssertionError, ValueError):
+        # 应用已处理过首个请求后无法再注册蓝图，命令与钩子仍即时生效
+        state.logger.warning('插件 %s 的蓝图无法在运行中注册（需重启服务生效）', ctx_name)
+        return False
+
+
+def _ensure_blueprint_templates(ctx, blueprint):
+    """修正插件蓝图的模板目录。
+
+    插件以无点模块名加载（chatter_plugin_<name>_<hex>），Flask 的
+    Blueprint(import_name) 据此推断 root_path 会得到不存在的路径；
+    且默认 template_folder 为 None，插件 templates/ 目录不会被注册进
+    Jinja 搜索路径，render_template 会一直 TemplateNotFound。
+    这里在注册前把 root_path 指向插件目录，并显式挂载 templates/。
+    """
+    template_folder = blueprint.template_folder or 'templates'
+    plugin_templates = os.path.join(ctx.directory, template_folder)
+    if not os.path.isdir(plugin_templates):
+        return
+    if blueprint.template_folder is None:
+        blueprint.template_folder = template_folder
+    current = os.path.join(blueprint.root_path, blueprint.template_folder)
+    if not os.path.isdir(current):
+        blueprint.root_path = ctx.directory
+
+
 def register_ctx(ctx, app):
     for blueprint, prefix, absolute in ctx._blueprints:
+        _ensure_blueprint_templates(ctx, blueprint)
         if absolute:
             # 绝对注册：忽略 base_path，前缀原样挂载到根路径
             url_prefix = ('/' + prefix.strip('/')).rstrip('/') if prefix else ''
@@ -203,11 +243,7 @@ def register_ctx(ctx, app):
             url_prefix = state.base_path
             if prefix:
                 url_prefix = (url_prefix + '/' + prefix.strip('/')).rstrip('/')
-        try:
-            app.register_blueprint(blueprint, url_prefix=url_prefix)
-        except AssertionError:
-            # 应用已处理过首个请求后无法再注册蓝图，命令与钩子仍即时生效
-            state.logger.warning('插件 %s 的蓝图在运行中无法注册（重启生效）', ctx.name)
+        _register_blueprint(app, blueprint, url_prefix, ctx.name)
     for cmd in ctx._commands:
         commands.COMMANDS[cmd['name']] = {
             'fn': cmd['fn'], 'permission': cmd['permission'],
@@ -236,23 +272,88 @@ def init(app):
         register_ctx(ctx, app)
 
 
-def reload_plugins(app):
-    """重载全部插件（管理面板使用）。蓝图类变更仍需重启生效。"""
-    for ctx in list(_contexts):
+def stop_plugin(name):
+    """热停止插件：卸载命令/钩子/CSS·JS 注入/工具链接，并清理内存中的模块。
+
+    已注册的蓝图路由因 Flask 限制无法注销，仍保持可访问。
+    """
+    ctx = _by_name.get(name)
+    if ctx is None:
+        return False
+    unload_ctx(ctx)
+    if ctx._module_name:
+        sys.modules.pop(ctx._module_name, None)
+    state.logger.info('插件已停止: %s', name)
+    return True
+
+
+def start_plugin(name):
+    """热启动/热加载插件：从磁盘重新加载入口代码并注册。
+
+    对新增的插件文件同样有效（discover 实时扫描插件目录）。
+    """
+    if name in _by_name:
+        return True
+    discovered = discover()
+    # 快路径：目录名/文件名/清单名匹配
+    for plugin in discovered:
+        if plugin['name'] != name and plugin['info'].get('name') != name:
+            continue
+        ctx = load_plugin(plugin)
+        if ctx is None:
+            state.logger.error('插件启动失败: %s', name)
+            return False
+        register_ctx(ctx, state.app)
+        state.logger.info('插件已启动: %s', name)
+        return True
+    # 兜底：按元信息名称匹配（单文件插件 PLUGIN_INFO.name 与文件名不同）
+    for plugin in discovered:
+        ctx = load_plugin(plugin)
+        if ctx is None:
+            continue
+        if ctx.name == name:
+            register_ctx(ctx, state.app)
+            state.logger.info('插件已启动: %s', name)
+            return True
         unload_ctx(ctx)
+    state.logger.warning('未找到插件: %s', name)
+    return False
+
+
+def reload_plugin(name):
+    """热重载单个插件（重新执行入口代码）。仅对已启用插件生效。"""
+    if name in _by_name:
+        stop_plugin(name)
+    if not is_enabled(name):
+        return False, '插件未启用，请先启用'
+    if not start_plugin(name):
+        return False, '插件加载失败（详见 log.txt）'
+    return True, ''
+
+
+def reload_plugins(app):
+    """热重载全部已启用插件。"""
+    for ctx in list(_contexts):
+        stop_plugin(ctx.name)
     init(app)
 
 
 def set_enabled(name, enabled):
+    """持久化启用状态并即时热启停插件（命令/钩子/注入立即生效）。"""
     cfg = config.load_config()
     states = cfg.setdefault('plugin_states', {})
     states[name] = bool(enabled)
     config.save_config(cfg)
     config.load_settings()
-    ctx = _by_name.get(name)
-    if ctx is not None:
-        ctx.enabled = bool(enabled)
+    if enabled:
+        start_plugin(name)
+    else:
+        stop_plugin(name)
     return bool(enabled)
+
+
+def is_loaded(name):
+    return name in _by_name
 
 
 # ---------------- 事件分发 ----------------
@@ -311,14 +412,37 @@ def head_injections():
 
 
 def tool_links():
-    links = []
+    """返回合并后的快捷工具列表（自定义 + 插件，自动过滤已删除的插件条目）。
+
+    每条为 dict：{key, plugin, title, url, icon, enabled}
+    - 自定义条目：无 key/plugin 字段，完全由管理员维护。
+    - 插件条目：由 add_tool_link 动态并入（追加到列表末尾），带稳定 key
+      （plugin|url）用于匹配；管理员可在设置中修改/禁用/排序/删除，
+      删除的 key 记入 config.json 的 removed_plugin_links 不再出现。
+    """
+    settings = state.settings or {}
+    custom = list(settings.get('custom_tool_links') or [])
+    removed = set(settings.get('removed_plugin_links') or [])
+    seen = set()
+    for entry in custom:
+        key = entry.get('key')
+        if key:
+            seen.add(key)
     for ctx in _contexts:
         for title, url in ctx._tool_links:
-            # 以 / 开头的站内链接自动补 base_path 前缀
-            if url.startswith('/') and not url.startswith(state.base_path):
-                url = state.base_path + url
-            links.append((title, url))
-    return links
+            key = '%s|%s' % (ctx.name, url)
+            if key in removed or key in seen:
+                continue
+            custom.append({
+                'key': key,
+                'plugin': ctx.name,
+                'title': title,
+                'url': url,
+                'icon': None,
+                'enabled': True,
+            })
+            seen.add(key)
+    return custom
 
 
 def list_plugins():

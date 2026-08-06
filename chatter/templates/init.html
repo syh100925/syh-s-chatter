@@ -278,6 +278,13 @@
                 <div class="hint">用于生成聊天室的跳转链接，<span style="color:var(--fg-secondary);">将自动识别当前访问地址</span></div>
             </div>
 
+            <!-- 服务端口 -->
+            <div class="form-group" style="margin-top:1.5rem;">
+                <label for="port">服务端口</label>
+                <input type="number" id="port" name="port" value="{{ port or 5000 }}" min="1" max="65535" required>
+                <div class="hint">聊天室 HTTP 服务监听端口，修改后需重启服务生效（当前访问不受影响）</div>
+            </div>
+
             <!-- 挂载路径（base_path） -->
             <div class="form-group" style="margin-top:1.5rem;">
                 <label for="base_path">挂载路径（可选，留空为根路径）</label>
@@ -398,6 +405,7 @@
                 '请确认以下初始化配置：\n\n' +
                 '数据库地址：' + dbIp + ':' + dbPort + '\n' +
                 '服务器地址：' + (serverIp || '(未填写)') + '\n' +
+                '服务端口：' + document.getElementById('port').value.trim() + '\n' +
                 '管理员账号：' + adminUser + '\n' +
                 '邀请码数量：' + inviteCount + '\n\n' +
                 '确认继续？';

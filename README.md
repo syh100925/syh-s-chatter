@@ -10,6 +10,7 @@
 ## ✨ 功能特性
 
 - 💬 **实时消息**：轮询刷新，近实时聊天体验
+- 📜 **消息分段渲染**：仅渲染底部窗口（200 条），滚动到顶部自动/点击加载更早消息
 - 🧩 **结构化消息**：JSON 消息 ID、回复引用、软撤回、系统公告与服务端禁言
 - 👤 **用户系统**：自定义昵称与颜色，密码使用 `werkzeug` 哈希存储
 - 🛡 **权限组**：细粒度权限点（消息、命令、管理、插件），可自定义权限组（见下文）
@@ -59,6 +60,39 @@ python server.py
 - **管理员账号** 与 **初始邀请码数量**
 
 初始化完成后页面展示邀请码，凭邀请码注册新用户。
+
+### 3. Nginx 反向代理（可选）
+
+将聊天室通过 nginx 对外提供（HTTPS / 子路径）时，按以下配置可避免跳转地址变成内网地址（如 `127.0.0.1:443`）：
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+    # ... ssl 配置 ...
+
+    # 裸前缀由 nginx 直接 301 到带斜杠路径，不进后端
+    location = /chat {
+        return 301 /chat/;
+    }
+
+    location /chat/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;                 # 传递原始 Host（不带 :443）
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;  # 告知后端实际为 https
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+}
+```
+
+> 说明：
+> - 跳转到 `127.0.0.1:443/sec/` 的根因是后端按 `Host` 头 + 默认 `http` 协议生成了绝对跳转地址；`proxy_set_header Host $host;` 与 `X-Forwarded-Proto` 可修正
+> - `location = /sec` 精确匹配：斜杠跳转由 nginx 完成，后端永远收不到裸前缀请求
+> - 若后端仍返回绝对跳转（旧版本），可追加 `proxy_redirect http://127.0.0.1:5000/ /;` 统一改写
+> - 初始化页的"服务器地址"应填对外域名（或留空自动识别），不要填内网 `127.0.0.1:443`，否则生成的跳转链接同样会带错误地址
 
 ---
 
@@ -177,7 +211,7 @@ def on_load(ctx):
 | `ctx.add_tool_link(title, url)` | 加入聊天室“工具集”弹窗 |
 | `ctx.get_config(key, default)` / `ctx.set_config(key, value)` | 读写插件 `config.json` |
 
-插件可访问 `chatter` 包内任意模块（`messages`、`permissions`、`state` 等）。启用/禁用可在管理面板即时切换；注册蓝图类变更需重启服务。
+插件可访问 `chatter` 包内任意模块（`messages`、`permissions`、`state` 等）。支持**热加载/热停止/热启动**：启用/禁用即时生效（命令、钩子、CSS/JS 注入、快捷工具链接），修改代码后可在管理面板"重载"单个或全部插件；新增插件文件无需重启即可加载。已注册的蓝图路由因 Flask 限制无法注销/新注册，此类变更需重启服务。
 
 ---
 
@@ -191,7 +225,7 @@ def on_load(ctx):
 - **流量**：总请求数、今日请求、独立 IP、近 7 天柱状图、热门路径
 - **数据库**：消息统计、dbstats、按用户查消息、删除用户消息、清空记录
 - **设置**：站点标题、服务器地址、端口、轮询间隔、默认禁言时长、挂载路径、管理员列表
-- **快捷工具**：编辑聊天室"工具集"弹窗中的自定义链接（与插件提供的链接一同展示）
+- **快捷工具**：编辑聊天室"工具集"弹窗中的自定义链接（与插件提供的链接一同展示）；支持 emoji 或 `#i-xxx` SVG 图标（可从图标库选择）；地址以 `/` 开头按根路径定位，不再追加 base_path
 
 ---
 
@@ -249,7 +283,7 @@ A：未连接上 MongoDB，使用了内存回退。检查 MongoDB 与 `config.js
 A：`base_path` 在启动时注册路由，修改后需重启服务。
 
 **Q：插件蓝图在“重载”后未更新？**  
-A：Flask 在首次请求后不允许注册新蓝图，此类变更需重启服务；命令与钩子即时生效。
+A：Flask 在首次请求后不允许注册新蓝图，含蓝图注册的变更需重启服务；命令、钩子、CSS/JS 注入等即时生效（单个或全部插件均可热重载）。
 
 ---
 

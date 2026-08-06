@@ -23,6 +23,11 @@ def _require(permission):
     return username, None
 
 
+def _initial_admin():
+    """受保护的初始管理员（初始化时创建的第一个管理员，不可被删除或降级）。"""
+    return str(config.load_config().get('initial_admin') or '')
+
+
 # ---------------- 用户 ----------------
 
 @bp.route('/admin/api/users', methods=['GET'])
@@ -33,6 +38,8 @@ def api_users():
     user_groups = state.settings.get('user_groups') or {}
     return jsonify({
         'ok': True,
+        'actor': actor,
+        'initial_admin': _initial_admin(),
         'users': [{
             'username': name,
             'color': users.get_user_color(name),
@@ -69,6 +76,10 @@ def api_user_rename():
     if old_name in sessions:
         sessions[new_name] = sessions.pop(old_name)
         auth.save_sessions(sessions)
+    cfg = config.load_config()
+    if cfg.get('initial_admin') == old_name:
+        cfg['initial_admin'] = new_name
+        config.save_config(cfg)
     return jsonify({'ok': True})
 
 
@@ -149,6 +160,12 @@ def api_user_group():
         return auth.json_error('用户不存在', 404)
     if group and group not in groups:
         return auth.json_error('权限组不存在', 404)
+    target = group or state.settings.get('default_group', 'user')
+    if username == _initial_admin() and not permissions.group_grants(target, 'admin.panel'):
+        return auth.json_error('初始管理员不可被移出管理员组', 400)
+    if username == actor and permissions.is_admin(actor) \
+            and not permissions.group_grants(target, 'admin.panel'):
+        return auth.json_error('不能移除自己的管理员权限', 400)
     cfg = config.load_config()
     user_groups = dict(state.settings.get('user_groups') or {})
     if group and group != state.settings.get('default_group'):
@@ -259,7 +276,19 @@ def api_plugin_toggle(name):
     enabled = bool(payload.get('enabled'))
     plugin_manager.set_enabled(name, enabled)
     logger.info('管理员 %s 将插件 %s 设为 %s', actor, name, '启用' if enabled else '禁用')
-    return jsonify({'ok': True, 'enabled': enabled})
+    return jsonify({'ok': True, 'enabled': enabled, 'loaded': plugin_manager.is_loaded(name)})
+
+
+@bp.route('/admin/api/plugins/<name>/reload', methods=['POST'])
+def api_plugin_reload(name):
+    actor, error = _require('admin.plugins')
+    if error:
+        return error
+    ok, message = plugin_manager.reload_plugin(name)
+    if not ok:
+        return auth.json_error(message or '重载失败', 400)
+    logger.info('管理员 %s 热重载了插件 %s', actor, name)
+    return jsonify({'ok': True, 'loaded': plugin_manager.is_loaded(name)})
 
 
 @bp.route('/admin/api/plugins/reload', methods=['POST'])
@@ -379,6 +408,7 @@ _TOOL_LINK_LIMIT = 50
 
 
 def _clean_tool_links(value):
+    """校验并清洗快捷工具条目：{title, url, icon?, enabled?, plugin?, key?}"""
     if not isinstance(value, list):
         return None
     cleaned = []
@@ -391,7 +421,19 @@ def _clean_tool_links(value):
             continue
         if len(cleaned) >= _TOOL_LINK_LIMIT:
             break
-        cleaned.append({'title': title[:100], 'url': url[:500]})
+        entry = {'title': title[:100], 'url': url[:500]}
+        icon = str(item.get('icon') or '').strip()[:32]
+        if icon:
+            entry['icon'] = icon
+        entry['enabled'] = bool(item.get('enabled', True))
+        # 插件条目：保留来源标记与稳定匹配键（修改内容不影响匹配）
+        if item.get('plugin'):
+            plugin = str(item.get('plugin') or '').strip()[:64]
+            key = str(item.get('key') or '').strip()[:200]
+            if plugin and key:
+                entry['plugin'] = plugin
+                entry['key'] = key
+        cleaned.append(entry)
     return cleaned
 
 
@@ -400,7 +442,7 @@ def api_tool_links():
     actor, error = _require('admin.tools')
     if error:
         return error
-    return jsonify({'ok': True, 'links': state.settings.get('custom_tool_links') or []})
+    return jsonify({'ok': True, 'links': plugin_manager.tool_links()})
 
 
 @bp.route('/admin/api/tool-links', methods=['POST'])
@@ -414,10 +456,20 @@ def api_tool_links_save():
         return auth.json_error('links 必须是数组', 400)
     cfg = config.load_config()
     cfg['custom_tool_links'] = cleaned
+    # 删除记录与已存列表合并：前端每次只上报“本次会话”删除的 key，
+    # 若直接覆盖会丢失之前删除的插件链接（下次保存即复活）。
+    present_keys = {entry['key'] for entry in cleaned if entry.get('key')}
+    existing_removed = set(cfg.get('removed_plugin_links') or [])
+    submitted_removed = set()
+    removed_list = payload.get('removed')
+    if isinstance(removed_list, list):
+        submitted_removed = {str(k)[:200] for k in removed_list if str(k).strip()}
+    cfg['removed_plugin_links'] = sorted(
+        (existing_removed | submitted_removed) - present_keys)
     config.save_config(cfg)
     config.load_settings()
     logger.info('管理员 %s 更新了快捷工具链接（%d 条）', actor, len(cleaned))
-    return jsonify({'ok': True, 'links': cleaned})
+    return jsonify({'ok': True, 'links': plugin_manager.tool_links()})
 
 
 # ---------------- 设置 ----------------
@@ -454,8 +506,13 @@ def api_settings_save():
             if not isinstance(value, list):
                 continue
             value = [str(v).strip() for v in value if str(v).strip()]
-            if actor not in value and not any(permissions.is_admin(u) for u in value):
-                continue  # 不允许把自己移除出管理员列表
+            initial_admin = str(cfg.get('initial_admin') or '')
+            if actor in state.admins and actor not in value:
+                continue  # 管理员不能移除自己的权限
+            if initial_admin and initial_admin not in value:
+                continue  # 初始管理员不可被移除
+            if not any(permissions.is_admin(u) for u in value):
+                continue  # 至少保留一名管理员
         elif key == 'base_path':
             value = str(value or '').strip().rstrip('/')
         elif key in ('port', 'poll_interval', 'mute_default_seconds'):

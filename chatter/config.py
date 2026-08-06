@@ -57,8 +57,16 @@ def load_settings():
     return cfg
 
 
+def normalize_base_path(value):
+    """规范化挂载前缀：去空白与尾部斜杠，补前导斜杠。空值返回 ''。"""
+    value = (value or '').strip().rstrip('/')
+    if value and not value.startswith('/'):
+        value = '/' + value
+    return value
+
+
 def apply_settings(cfg):
     state.settings = cfg
     state.server_ip = cfg.get('server_ip', '')
-    state.base_path = (cfg.get('base_path') or '').strip().rstrip('/')
+    state.base_path = normalize_base_path(cfg.get('base_path'))
     state.admins = list(cfg.get('admins') or [])

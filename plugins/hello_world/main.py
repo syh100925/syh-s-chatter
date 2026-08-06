@@ -45,7 +45,7 @@ def on_load(ctx):
         console.log('[plugin:hello_world] loaded, base_path=' + BASE_PATH);
     ''')
 
-    # 5. 工具集链接（以 / 开头的链接会自动加上 base_path 前缀）
+    # 5. 工具集链接（以 / 开头按根路径定位，不再追加 base_path）
     ctx.add_tool_link('Hello World 插件页', '/plugins/hello_world/about')
 
     # 6. 钩子：消息发送时记录

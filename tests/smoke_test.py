@@ -45,6 +45,8 @@ def main():
         # 3. 初始化后根路径 → 登录页
         r = client.get('/')
         assert r.status_code == 200 and b'login' in r.data.lower(), '应返回登录页'
+        assert b"cursor:url('/static/cur-default.png')" in r.data, \
+            '聊天室页面应注入自定义鼠标指针'
 
         # 4. 注册新用户
         r = client.post('/register', data={
@@ -73,6 +75,12 @@ def main():
         assert data['ok'] and data['is_admin'], 'chattss 响应异常'
         assert any(m['content'] == 'hello world' for m in data['messages']), '消息未返回'
         assert 'chat.clear' in data['permissions'], '管理员应拥有全部权限'
+        assert b'cur-default' not in r.data, 'JSON 接口不应注入鼠标指针样式'
+
+        # 7b. 插件页面不应注入鼠标指针（仅聊天室路由生效）
+        r = client.get('/plugins/hello_world/about')
+        assert r.status_code == 200, '插件页面应可访问'
+        assert b'cur-default' not in r.data, '插件页面不应注入鼠标指针'
 
         # 8. 撤回消息（hello world）
         target_id = None
@@ -123,6 +131,36 @@ def main():
             'username': 'alice', 'update': alice_token, 'target': 'bob', 'duration': 60})
         assert r.status_code == 403, '普通用户禁言应被拒绝'
 
+        # 12b. 账户保护：初始管理员不可被删除/降级，管理员不可移除自己的权限
+        r = client.get('/admin/api/users?update=' + admin_token)
+        users_data = r.get_json()
+        assert users_data['ok'] and users_data['initial_admin'] == 'admin', '应回传初始管理员标记'
+        assert users_data['actor'] == 'admin', '应回传当前操作者'
+        # 删除初始管理员（自己）→ 拒绝
+        r = client.post('/admin/api/users/delete', json={
+            'username': 'admin', 'update': admin_token, 'username': 'admin'})
+        assert r.status_code == 400, '删除初始管理员应被拒绝'
+        # 通过设置移除自己的 admin 权限 → 拒绝（admins 保持原样）
+        r = client.post('/admin/api/settings', json={
+            'username': 'admin', 'update': admin_token,
+            'settings': {'admins': ['alice']}})
+        settings_data = r.get_json()
+        assert 'admin' in settings_data['settings']['admins'], \
+            '初始管理员不可被移出管理员列表'
+        # 通过权限组把初始管理员降级 → 拒绝
+        r = client.post('/admin/api/users/group', json={
+            'username': 'admin', 'update': admin_token, 'username': 'admin', 'group': 'user'})
+        assert r.status_code == 400, '把初始管理员移出管理员组应被拒绝'
+        assert 'admin' in state.admins, '初始管理员应仍保留在管理员列表'
+        # 删除普通用户 → 允许
+        r = client.post('/register', data={
+            'username': 'bob', 'password': 'bob123', 'invite_code': codes[1],
+            'color': '#00ff00'})
+        assert r.status_code == 302, 'bob 注册失败'
+        r = client.post('/admin/api/users/delete', json={
+            'username': 'admin', 'update': admin_token, 'username': 'bob'})
+        assert r.status_code == 200, '删除普通用户应允许'
+
         # 13. 在线列表与用户名列表
         r = client.post('/get_online', json={'username': 'admin', 'update': admin_token})
         assert r.status_code == 200
@@ -172,6 +210,13 @@ def main():
             # 带前缀登录页
             r = client2.get('/chat/')
             assert r.status_code == 200 and b'login' in r.data.lower(), '应返回登录页'
+            assert b"cursor:url('/chat/static/cur-default.png')" in r.data, \
+                '带前缀时鼠标指针 URL 应带上前缀'
+
+            # 裸前缀（无尾斜杠）应相对重定向到 /chat/（修复前为绝对 308 URL）
+            r = client2.get('/chat')
+            assert r.status_code == 302 and r.headers['Location'] == '/chat/', \
+                'GET /chat 应 302 相对跳转到 /chat/'
 
             # ============ 场景 B：删掉 config.json 重新初始化，前缀应被清空 ============
             os.remove(os.path.join(tmp2, 'config.json'))
@@ -198,7 +243,54 @@ def main():
         finally:
             shutil.rmtree(tmp2, ignore_errors=True)
 
-        print('OK: 冒烟测试全部通过（14 项 + 前缀场景 A/B）')
+        # ============ 场景 C：前缀规范化与端口配置 ============
+        tmp3 = tempfile.mkdtemp(prefix='chatter_test_norm_')
+        try:
+            app3 = create_app(data_dir=tmp3, base_path='/chat')
+            client3 = app3.test_client()
+
+            # 输入不带前导斜杠、带尾斜杠的前缀 + 自定义端口
+            r = client3.post('/chat/init', data={
+                'db_ip': '127.0.0.1', 'db_port': '27017', 'db_user': '', 'db_pass': '',
+                'server_ip': '127.0.0.1:9090',
+                'admin_user': 'admin', 'admin_pass': 'admin123',
+                'admin_pass_confirm': 'admin123', 'invite_count': '1',
+                'base_path': 'chat/', 'port': '9090',
+            })
+            assert r.status_code == 200, '初始化（前缀+端口）应成功'
+            cfg3 = json.load(open(os.path.join(tmp3, 'config.json'), encoding='utf-8'))
+            assert cfg3.get('base_path') == '/chat', '"chat/" 应规范化为 "/chat"'
+            assert cfg3.get('port') == 9090, '初始化应保存端口 9090'
+            assert '9090' in r.data.decode('utf-8'), '完成页应展示保存的端口'
+
+            # 裸前缀相对重定向
+            r = client3.get('/chat')
+            assert r.status_code == 302 and r.headers['Location'] == '/chat/', \
+                '规范化前缀后 GET /chat 仍应相对跳转'
+            assert client3.get('/chat/').status_code == 200, '前缀下页面应可访问'
+        finally:
+            shutil.rmtree(tmp3, ignore_errors=True)
+
+        # ============ 场景 D：端口校验（非法端口不写库） ============
+        tmp4 = tempfile.mkdtemp(prefix='chatter_test_port_')
+        try:
+            app4 = create_app(data_dir=tmp4)
+            client4 = app4.test_client()
+            r = client4.post('/init', data={
+                'db_ip': '127.0.0.1', 'db_port': '27017', 'db_user': '', 'db_pass': '',
+                'server_ip': '127.0.0.1',
+                'admin_user': 'admin', 'admin_pass': 'admin123',
+                'admin_pass_confirm': 'admin123', 'invite_count': '1',
+                'base_path': '', 'port': '99999',
+            })
+            assert r.status_code == 200 and '端口' in r.data.decode('utf-8'), \
+                '非法端口应重新渲染并提示'
+            assert not os.path.exists(os.path.join(tmp4, 'config.json')), \
+                '非法端口不应写入配置'
+        finally:
+            shutil.rmtree(tmp4, ignore_errors=True)
+
+        print('OK: 冒烟测试全部通过（15 项 + 前缀场景 A/B + 规范化场景 C/D）')
         return 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

@@ -64,6 +64,23 @@ def register_into(app, settings=None, data_dir=None, base_path=None):
 
     _register_blueprints(app)
 
+    # 聊天室页面统一自定义鼠标指针（仅核心聊天室蓝图；插件/宿主页面不受影响）。
+    # 用 after_request 注入而非改模板：新增聊天室路由自动生效。
+    core_blueprints = ('auth', 'chat', 'init', 'admin_page', 'admin_api')
+    cursor_style = ("<style>*{cursor:url('%s/static/cur-default.png'),auto;}</style>"
+                    % state.base_path)
+
+    @app.after_request
+    def apply_chatroom_cursor(response):
+        if response.mimetype == 'text/html' and request.blueprint in core_blueprints:
+            html = response.get_data(as_text=True)
+            if '<head>' in html:
+                html = html.replace('<head>', '<head>' + cursor_style, 1)
+            elif '</body>' in html:
+                html = html.replace('</body>', cursor_style + '</body>', 1)
+            response.set_data(html)
+        return response
+
     @app.before_request
     def check_initialized():
         bp = state.base_path
@@ -86,14 +103,21 @@ def register_into(app, settings=None, data_dir=None, base_path=None):
     @app.context_processor
     def inject_globals():
         injections = plugin_manager.head_injections()
-        links = plugin_manager.tool_links()
-        for link in (state.settings.get('custom_tool_links') or []):
-            title = str(link.get('title') or '').strip()
+        links = []
+        for link in plugin_manager.tool_links():
+            if not link.get('enabled', True):
+                continue
             url = str(link.get('url') or '').strip()
-            if title and url:
-                if url.startswith('/') and not url.startswith(state.base_path):
-                    url = state.base_path + url
-                links.append((title, url))
+            title = str(link.get('title') or '').strip()
+            if not title or not url:
+                continue
+            # 以 / 开头的地址一律按根路径定位（插件条目同样为绝对注册），
+            # 不再自动追加 base_path 前缀；其余地址原样（相对当前页面）
+            links.append({
+                'title': title,
+                'url': url,
+                'icon': str(link.get('icon') or '').strip() or None,
+            })
         return {
             'base_path': state.base_path,
             'site_title': state.settings.get('site_title', "syh's chatter"),
@@ -115,5 +139,12 @@ def create_app(settings=None, data_dir=None, base_path=None):
         # 独立运行时，裸根路径重定向到挂载前缀（嵌入宿主应用时不注册此路由）
         @app.route('/')
         def root_redirect():
+            return redirect(state.base_path + '/')
+
+        # 裸前缀（无尾斜杠）也重定向到带斜杠路径。
+        # 显式注册此路由可避免 Werkzeug 自动 308 跳转生成绝对 URL
+        # （反代/HTTPS 场景下会错误带上 :443 等端口），改为相对跳转。
+        @app.route(state.base_path)
+        def base_path_redirect():
             return redirect(state.base_path + '/')
     return app

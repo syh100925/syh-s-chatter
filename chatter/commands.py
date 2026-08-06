@@ -20,16 +20,27 @@ def register_command(name, permission='admin', description=''):
 
 
 def dispatch(username, command_str, d_time):
+    info = resolve(username, command_str, d_time)
+    return info['message'] if info['status'] == 'executed' else None
+
+
+def resolve(username, command_str, d_time):
+    """解析命令执行状态，供前端终端反馈展示。
+
+    返回 {'name': 命令名, 'status': 'executed'|'permission_denied'|'unknown',
+          'message': 执行结果消息或 None}。
+    """
     parts = command_str[9:].split()
     if not parts:
-        return None
+        return {'name': '', 'status': 'unknown', 'message': None}
     command = parts[0]
     entry = COMMANDS.get(command)
     if entry is None:
-        return None
+        return {'name': command, 'status': 'unknown', 'message': None}
     if not permissions.can_execute_command(username, entry['permission']):
-        return None
-    return entry['fn'](username, parts, d_time, command_str)
+        return {'name': command, 'status': 'permission_denied', 'message': None}
+    return {'name': command, 'status': 'executed',
+            'message': entry['fn'](username, parts, d_time, command_str)}
 
 
 def post_raw_message(username, command_str, d_time):
