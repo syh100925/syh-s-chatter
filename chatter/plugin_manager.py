@@ -65,8 +65,16 @@ class PluginContext:
     # ---------------- 注册接口 ----------------
 
     def register_blueprint(self, blueprint, url_prefix=''):
-        """注册新服务（页面/API 路由）。"""
-        self._blueprints.append((blueprint, url_prefix))
+        """注册新服务（页面/API 路由），挂载到 base_path 前缀下。"""
+        self._blueprints.append((blueprint, url_prefix, False))
+
+    def register_blueprint_absolute(self, blueprint, url_prefix=''):
+        """注册新服务（页面/API 路由），忽略 base_path，直接挂载到根路径。
+
+        适用于自带绝对 URL 的旧服务（如迁移自旧 server.py 的插件），
+        保证 base_path 变更不影响其地址。
+        """
+        self._blueprints.append((blueprint, url_prefix, True))
 
     def add_command(self, name, fn, permission=None, description=''):
         """注册聊天命令：command: <name> ..."""
@@ -187,10 +195,14 @@ def is_enabled(name):
 
 
 def register_ctx(ctx, app):
-    for blueprint, prefix in ctx._blueprints:
-        url_prefix = state.base_path
-        if prefix:
-            url_prefix = (url_prefix + '/' + prefix.strip('/')).rstrip('/')
+    for blueprint, prefix, absolute in ctx._blueprints:
+        if absolute:
+            # 绝对注册：忽略 base_path，前缀原样挂载到根路径
+            url_prefix = ('/' + prefix.strip('/')).rstrip('/') if prefix else ''
+        else:
+            url_prefix = state.base_path
+            if prefix:
+                url_prefix = (url_prefix + '/' + prefix.strip('/')).rstrip('/')
         try:
             app.register_blueprint(blueprint, url_prefix=url_prefix)
         except AssertionError:

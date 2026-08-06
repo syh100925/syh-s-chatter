@@ -281,7 +281,7 @@
             <!-- 挂载路径（base_path） -->
             <div class="form-group" style="margin-top:1.5rem;">
                 <label for="base_path">挂载路径（可选，留空为根路径）</label>
-                <input type="text" id="base_path" name="base_path" value="{{ base_path or '' }}" placeholder="例如：/chat">
+                <input type="text" id="base_path" name="base_path" value="{{ base_path_value or '' }}" placeholder="例如：/chat">
                 <div class="hint">将聊天室挂载到指定子路径（如 <span style="color:var(--fg-secondary);">http://IP:5000/chat</span>），便于与其它服务共存</div>
             </div>
 
@@ -370,7 +370,7 @@
             pingResult.style.color = 'var(--fg-secondary)';
 
             try {
-                const response = await fetch('/init/ping', {
+                const response = await fetch('{{ base_path }}/init/ping', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ db_ip: dbIp, db_port: dbPort, db_user: dbUser, db_pass: dbPass })

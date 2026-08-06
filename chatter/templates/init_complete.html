@@ -322,7 +322,14 @@
             {% endif %}
         </div>
 
-        <a href="{{ base_path }}/" class="btn-login">前往登录</a>
+        {% if restart_required %}
+        <div class="info-line" style="color: #ffaa00;">
+            前缀已保存为 <strong>{{ saved_base_path or '/' }}</strong>，需<b>重启服务</b>后生效；
+            重启前请继续使用当前地址访问。
+        </div>
+        {% endif %}
+
+        <a href="{{ live_base_path }}/" class="btn-login">前往登录</a>
 
         <div class="footer-note">
             <span>请妥善保管邀请码</span>

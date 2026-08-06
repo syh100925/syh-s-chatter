@@ -171,7 +171,8 @@ def on_load(ctx):
 | --- | --- |
 | `ctx.add_command(name, fn, permission, description)` | 注册聊天命令（`command: 名称 …`） |
 | `ctx.on(event, handler)` | 钩子：`message_send`、`chat_data`、`login`、`logout`、`register`、`message_recall` |
-| `ctx.register_blueprint(bp, url_prefix)` | 注册页面/API 蓝图 |
+| `ctx.register_blueprint(bp, url_prefix)` | 注册页面/API 蓝图（挂载到 `base_path` 下） |
+| `ctx.register_blueprint_absolute(bp, url_prefix)` | 注册页面/API 蓝图（忽略 `base_path`，挂载到根路径） |
 | `ctx.add_css(...)` / `ctx.add_js(...)` | 注入 CSS / JS（原始代码或插件内文件路径） |
 | `ctx.add_tool_link(title, url)` | 加入聊天室“工具集”弹窗 |
 | `ctx.get_config(key, default)` / `ctx.set_config(key, value)` | 读写插件 `config.json` |

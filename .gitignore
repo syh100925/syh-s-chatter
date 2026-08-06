@@ -59,6 +59,8 @@ desktop.ini
 .coverage
 htmlcov/
 .tox/
+.opencode/
+trans/
 .mypy_cache/
 .dmypy.json
 dmypy.json

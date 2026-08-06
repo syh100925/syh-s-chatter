@@ -31,13 +31,16 @@ def init_page():
 
     if request.method == 'GET':
         cfg = config.load_config()
+        # 不显式传 base_path：模板统一使用上下文处理器注入的实时挂载前缀
+        # （state.base_path），避免全新安装（无 config.json）时表单/接口路径丢失前缀。
+        # 表单中的 base_path 输入框由上下文处理器预填实际前缀，用户可修改。
         return render_template('init.html',
                                db_ip=cfg.get('db_ip', '127.0.0.1'),
                                db_port=cfg.get('db_port', '27017'),
                                db_user=cfg.get('db_user', ''),
                                db_pass=cfg.get('db_pass', ''),
                                server_ip=cfg.get('server_ip', ''),
-                               base_path=cfg.get('base_path', ''),
+                               base_path_value=state.base_path,
                                admin_user='admin',
                                error=None)
 
@@ -56,7 +59,7 @@ def init_page():
     def re_render(error_message):
         return render_template('init.html', error=error_message,
                                db_ip=db_ip, db_port=db_port, db_user=db_user, db_pass=db_pass,
-                               server_ip=new_server_ip, base_path=new_base_path,
+                               server_ip=new_server_ip, base_path_value=new_base_path,
                                admin_user=admin_user, invite_count=invite_count)
 
     # 基本验证
@@ -72,6 +75,7 @@ def init_page():
         invite_count = 5
 
     # 保存配置（包含管理员列表与管理员的 admin 权限组）
+    old_base_path = state.base_path  # 当前实际挂载前缀（前缀变更前重启无效）
     new_config = config.load_config()
     new_config.update({
         'db_ip': db_ip,
@@ -79,7 +83,7 @@ def init_page():
         'db_user': db_user,
         'db_pass': db_pass,
         'server_ip': new_server_ip,
-        'base_path': new_base_path or state.settings.get('base_path', ''),
+        'base_path': new_base_path,
         'admins': [admin_user],
     })
     user_groups = dict(new_config.get('user_groups') or {})
@@ -117,7 +121,10 @@ def init_page():
                            admin_user=admin_user,
                            invite_codes=generated_codes,
                            db_ip=db_ip,
-                           server_ip=new_server_ip)
+                           server_ip=new_server_ip,
+                           live_base_path=old_base_path,
+                           saved_base_path=new_base_path,
+                           restart_required=(new_base_path != old_base_path))
 
 
 @bp.route('/init/ping', methods=['POST'])

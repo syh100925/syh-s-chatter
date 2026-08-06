@@ -56,7 +56,8 @@ def on_load(ctx):
 
 | 方法 | 用途 |
 | --- | --- |
-| `ctx.register_blueprint(blueprint, url_prefix='')` | 注册 Flask 蓝图（页面/API 路由） |
+| `ctx.register_blueprint(blueprint, url_prefix='')` | 注册 Flask 蓝图（页面/API 路由），挂载到全局 `base_path` 前缀下 |
+| `ctx.register_blueprint_absolute(blueprint, url_prefix='')` | 注册 Flask 蓝图，**忽略** `base_path`，直接挂载到根路径（用于迁移自旧系统的、带绝对 URL 的服务） |
 | `ctx.add_command(name, fn, permission=None, description='')` | 注册聊天命令 `command: <name> ...` |
 | `ctx.on(event, handler)` | 注册钩子事件处理器 |
 | `ctx.add_css(css)` | 注入 CSS：传原始 CSS 字符串，或插件目录内 `.css` 文件路径 |
@@ -100,7 +101,8 @@ bp = Blueprint('my_pages', __name__)
 def about():
     return '<h1>插件页面</h1>'
 
-ctx.register_blueprint(bp)   # url_prefix 可选，默认为全局 base_path
+ctx.register_blueprint(bp)              # 挂载到 base_path 下（如 /chat/plugins/my_plugin/about）
+ctx.register_blueprint_absolute(bp, 'about')   # 忽略 base_path，挂载到根路径（/about）
 ```
 
 > **注意**：Flask 在应用处理首个请求后禁止注册新蓝图。运行中通过"重载全部"启用的新蓝图不会生效，需重启服务；聊天命令、钩子、CSS/JS 注入则即时生效。

@@ -2,6 +2,7 @@
 
 用法：python -m tests.smoke_test  （无需真实 MongoDB，使用 mongomock 回退）
 """
+import json
 import os
 import re
 import shutil
@@ -132,7 +133,72 @@ def main():
         r = client.get('/logout?update=' + admin_token)
         assert r.status_code == 302
 
-        print('OK: 冒烟测试全部通过（14 项）')
+        # ============ 场景 A：带前缀（base_path='/chat'）初始化与路由 ============
+        tmp2 = tempfile.mkdtemp(prefix='chatter_test_prefix_')
+        try:
+            app2 = create_app(data_dir=tmp2, base_path='/chat')
+            client2 = app2.test_client()
+
+            # 未初始化时，根路径经 before_request 跳转到前缀下的 /init
+            r = client2.get('/')
+            assert r.status_code == 302 and r.headers['Location'].endswith('/chat/init'), \
+                '带前缀时根路径应跳转到 /chat/init'
+
+            # 初始化页应在前缀下可访问，且 ping 请求 URL 带上前缀
+            r = client2.get('/chat/init')
+            assert r.status_code == 200, '带前缀时初始化页应可访问'
+            assert b"fetch('/chat/init/ping'" in r.data, '初始化页 JS 应包含带前缀的 ping URL'
+
+            # 数据库测试接口在前缀下应可用（修复前为 404）
+            r = client2.post('/chat/init/ping', json={
+                'db_ip': '127.0.0.1', 'db_port': '27017', 'db_user': '', 'db_pass': ''})
+            assert r.status_code == 200, '带前缀时 /init/ping 应返回 200'
+
+            # 带前缀初始化
+            r = client2.post('/chat/init', data={
+                'db_ip': '127.0.0.1', 'db_port': '27017', 'db_user': '', 'db_pass': '',
+                'server_ip': '127.0.0.1:5000',
+                'admin_user': 'admin', 'admin_pass': 'admin123',
+                'admin_pass_confirm': 'admin123', 'invite_count': '1',
+                'base_path': '/chat',
+            })
+            assert r.status_code == 200, '带前缀初始化应成功'
+            cfg2 = json.load(open(os.path.join(tmp2, 'config.json'), encoding='utf-8'))
+            assert cfg2.get('base_path') == '/chat', '初始化应保存 base_path=/chat'
+            # 前缀未变更：完成页登录链接指向当前挂载，且无重启提示
+            assert b'href="/chat/"' in r.data, '完成页登录链接应指向 /chat/'
+            assert '重启服务' not in r.data.decode('utf-8'), '前缀未变更时不应提示重启'
+
+            # 带前缀登录页
+            r = client2.get('/chat/')
+            assert r.status_code == 200 and b'login' in r.data.lower(), '应返回登录页'
+
+            # ============ 场景 B：删掉 config.json 重新初始化，前缀应被清空 ============
+            os.remove(os.path.join(tmp2, 'config.json'))
+            # 服务未重启，state.settings 仍持有旧前缀 /chat（复现旧 bug 的条件）
+
+            r = client2.get('/chat/init')
+            assert r.status_code == 200, '删除 config.json 后初始化页仍应可访问'
+
+            # base_path 留空提交（用户想从根路径重来）
+            r = client2.post('/chat/init', data={
+                'db_ip': '127.0.0.1', 'db_port': '27017', 'db_user': '', 'db_pass': '',
+                'server_ip': '127.0.0.1:5000',
+                'admin_user': 'admin2', 'admin_pass': 'admin123',
+                'admin_pass_confirm': 'admin123', 'invite_count': '1',
+                'base_path': '',
+            })
+            assert r.status_code == 200, '重新初始化应成功'
+            cfg2 = json.load(open(os.path.join(tmp2, 'config.json'), encoding='utf-8'))
+            assert cfg2.get('base_path') == '', 'base_path 留空时不应回退到内存中的旧前缀（修复点）'
+            # 前缀发生了变更（/chat -> ''）：完成页应提示重启，且登录链接指向当前实际挂载
+            html2 = r.data.decode('utf-8')
+            assert '重启服务' in html2, '前缀变更时应提示重启生效'
+            assert 'href="/chat/"' in html2, '重启前登录链接应指向当前实际挂载 /chat/'
+        finally:
+            shutil.rmtree(tmp2, ignore_errors=True)
+
+        print('OK: 冒烟测试全部通过（14 项 + 前缀场景 A/B）')
         return 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
