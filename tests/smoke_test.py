@@ -115,6 +115,28 @@ def main():
         assert any(m['user'] == 'alice' and m['content'] == 'command: delete 1'
                    for m in data['messages']), '无权限命令应作为普通消息发送'
 
+        # 10b. 撤回鉴权：普通用户只能撤回自己的消息，管理员可撤回任意消息
+        assert 'message.recall.any' not in alice_data['permissions'], \
+            '普通用户不应拥有 message.recall.any 权限'
+        r = client.post('/chatts-new', json={
+            'username': 'admin', 'update': admin_token, 'upload_value': 'recall target'})
+        assert r.status_code == 200, '发消息失败'
+        recall_target = r.get_json()['message']['id']
+        r = client.post('/api/messages/%s/recall' % recall_target, json={
+            'username': 'alice', 'update': alice_token})
+        assert r.status_code == 403, '普通用户撤回他人消息应被拒绝'
+        r = client.post('/api/messages/%s/recall' % recall_target, json={
+            'username': 'admin', 'update': admin_token})
+        assert r.status_code == 200, '管理员应可撤回他人消息'
+        r = client.post('/chattss', json={'username': 'alice', 'update': alice_token})
+        own_data = r.get_json()
+        own_target = next((m['id'] for m in own_data['messages']
+                           if m['user'] == 'alice'), None)
+        assert own_target, '应能找到 alice 自己的消息'
+        r = client.post('/api/messages/%s/recall' % own_target, json={
+            'username': 'alice', 'update': alice_token})
+        assert r.status_code == 200, '普通用户应能撤回自己的消息'
+
         # 11. 禁言 + 禁言后发消息被拒
         r = client.post('/api/mute', json={
             'username': 'admin', 'update': admin_token, 'target': 'alice', 'duration': 60})

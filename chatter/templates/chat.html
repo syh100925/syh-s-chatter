@@ -154,9 +154,9 @@
     </aside>
     {% endif %}
 
-    <!-- 终端反馈区（快捷指令左侧，发送消息时滑出，超时自动缩回） -->
+    <!-- 终端反馈区（快捷指令左侧，发送消息时滑出，超时自动缩回；可拖动/隐藏，位置与显隐记忆在 localStorage） -->
     <aside class="cmd-terminal" id="cmdTerminal" aria-hidden="true">
-        <div class="term-header">
+        <div class="term-header" id="termHeader">
             <span class="term-title">终端 · 执行记录</span>
             <span class="term-controls">
                 <select id="termRetractSel" title="自动缩回时间">
@@ -167,10 +167,13 @@
                 </select>
                 <button type="button" id="termPinBtn" title="固定面板">固定</button>
                 <button type="button" id="termClearBtn" title="清空记录">清空</button>
+                <button type="button" id="termHideBtn" title="隐藏终端（可在右上角恢复）">隐藏</button>
             </span>
         </div>
         <div class="term-body" id="termBody"></div>
     </aside>
+    <!-- 终端隐藏后的恢复按钮 -->
+    <button type="button" class="term-show-btn" id="termShowBtn" title="显示终端">终端</button>
 
     <!-- 管理面板内容（按需加载，见 chat.js） -->
     <div id="adminWindowHost" hidden></div>

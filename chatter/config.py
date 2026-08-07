@@ -37,8 +37,9 @@ def default_settings():
         # 权限组（Phase 4 启用）
         'permission_groups': {
             'admin': ['*'],
-            'moderator': ['message.*', 'chat.delete', 'moderation.mute', 'moderation.unmute'],
-            'user': ['message.*'],
+            'moderator': ['message.send', 'message.recall.any',
+                          'chat.delete', 'moderation.mute', 'moderation.unmute'],
+            'user': ['message.send'],
         },
         'user_groups': {},
         'default_group': 'user',

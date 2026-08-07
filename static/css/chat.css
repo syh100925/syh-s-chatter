@@ -634,6 +634,18 @@
             opacity: 1;
             visibility: visible;
         }
+        /* 已拖动过：位置由 left/top 决定，禁用滑入动画（保留淡入淡出） */
+        .cmd-terminal.dragged {
+            transform: none;
+            transition: opacity 0.25s ease, visibility 0.25s;
+        }
+        .cmd-terminal.dragging {
+            user-select: none;
+            transition: none;
+        }
+        .cmd-terminal.dragging .term-header {
+            cursor: grabbing;
+        }
         .term-header {
             display: flex;
             align-items: center;
@@ -642,12 +654,17 @@
             padding: 8px 12px;
             border-bottom: 1px solid var(--border-color);
             flex-shrink: 0;
+            cursor: grab;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
         }
         .term-title {
             color: var(--fg-muted);
             font-size: 0.72rem;
             letter-spacing: 1px;
             text-transform: uppercase;
+            pointer-events: none;
         }
         .term-controls {
             display: flex;
@@ -706,9 +723,37 @@
         .term-error .term-text {
             color: var(--term-error);
         }
+        /* 终端隐藏后的恢复按钮（右上角，主题切换按钮下方） */
+        .term-show-btn {
+            position: fixed;
+            top: 76px;
+            right: 28px;
+            z-index: 9996;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--fg-secondary);
+            padding: 8px 14px;
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: color var(--transition-speed), border-color var(--transition-speed);
+        }
+        .term-show-btn.visible {
+            display: flex;
+        }
+        .term-show-btn:hover {
+            color: var(--fg-primary);
+            border-color: var(--fg-primary);
+        }
         @media (max-width: 1180px) {
             .cmd-sidebar,
-            .cmd-terminal {
+            .cmd-terminal,
+            .term-show-btn {
                 display: none;
             }
         }

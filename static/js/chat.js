@@ -1042,20 +1042,60 @@ function can(permission) {
             });
 
             // ================================================================
-            //  终端反馈区（快捷指令左侧；发送消息时滑出，超时自动缩回）
+            //  终端反馈区（快捷指令左侧；发送消息时滑出，超时自动缩回；可拖动/隐藏）
             // ================================================================
             const termPanel = document.getElementById('cmdTerminal');
+            const termHeader = document.getElementById('termHeader');
             const termBody = document.getElementById('termBody');
             const termRetractSel = document.getElementById('termRetractSel');
             const termPinBtn = document.getElementById('termPinBtn');
             const termClearBtn = document.getElementById('termClearBtn');
+            const termHideBtn = document.getElementById('termHideBtn');
+            const termShowBtn = document.getElementById('termShowBtn');
             let termPinned = false;
             let termTimer = null;
+            let termDragged = false;
 
             function termTime() {
                 const d = new Date();
                 const p = function (n) { return (n < 10 ? '0' : '') + n; };
                 return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+            }
+
+            function termIsHidden() {
+                try { return localStorage.getItem('termHidden') === '1'; } catch (e) { return false; }
+            }
+
+            function termSetHidden(hidden) {
+                try { localStorage.setItem('termHidden', hidden ? '1' : '0'); } catch (e) {}
+            }
+
+            function termSyncShowBtn() {
+                if (termShowBtn) termShowBtn.classList.toggle('visible', termIsHidden());
+            }
+
+            function termLoadPos() {
+                if (!termPanel) return;
+                try {
+                    const saved = localStorage.getItem('termPos');
+                    if (!saved) return;
+                    const pos = JSON.parse(saved);
+                    if (typeof pos.left !== 'number' || typeof pos.top !== 'number') return;
+                    termDragged = true;
+                    termPanel.classList.add('dragged');
+                    termPanel.style.left = pos.left + 'px';
+                    termPanel.style.top = pos.top + 'px';
+                } catch (e) {}
+            }
+
+            function termSavePos() {
+                if (!termPanel || !termDragged) return;
+                try {
+                    localStorage.setItem('termPos', JSON.stringify({
+                        left: parseInt(termPanel.style.left, 10) || 0,
+                        top: parseInt(termPanel.style.top, 10) || 0,
+                    }));
+                } catch (e) {}
             }
 
             function termLog(type, text) {
@@ -1077,7 +1117,7 @@ function can(permission) {
             }
 
             function termActivity() {
-                if (!termPanel) return;
+                if (!termPanel || termIsHidden()) return;
                 termPanel.classList.add('active');
                 termPanel.setAttribute('aria-hidden', 'false');
                 clearTimeout(termTimer);
@@ -1117,6 +1157,65 @@ function can(permission) {
                         termActivity();
                     });
                 }
+                if (termHideBtn) {
+                    termHideBtn.addEventListener('click', function () {
+                        termSetHidden(true);
+                        clearTimeout(termTimer);
+                        termPanel.classList.remove('active');
+                        termPanel.setAttribute('aria-hidden', 'true');
+                        termSyncShowBtn();
+                    });
+                }
+                if (termShowBtn) {
+                    termShowBtn.addEventListener('click', function () {
+                        termSetHidden(false);
+                        termPinned = true;
+                        if (termPinBtn) {
+                            termPinBtn.textContent = '取消固定';
+                            termPinBtn.classList.add('active');
+                        }
+                        termActivity();
+                        termSyncShowBtn();
+                    });
+                }
+                if (termHeader) {
+                    termHeader.addEventListener('pointerdown', function (e) {
+                        if (e.button !== 0) return;
+                        if (e.target.closest && e.target.closest('select,button')) return;
+                        e.preventDefault();
+                        const rect = termPanel.getBoundingClientRect();
+                        const startX = e.clientX;
+                        const startY = e.clientY;
+                        const baseLeft = rect.left;
+                        const baseTop = rect.top;
+                        let moved = false;
+                        const onMove = function (ev) {
+                            const vw = window.innerWidth;
+                            const vh = window.innerHeight;
+                            const minVisible = 60;
+                            const left = Math.max(minVisible - rect.width,
+                                Math.min(baseLeft + (ev.clientX - startX), vw - minVisible));
+                            const top = Math.max(0, Math.min(baseTop + (ev.clientY - startY), vh - 40));
+                            if (!moved) {
+                                moved = true;
+                                termDragged = true;
+                                termPanel.classList.add('dragged', 'dragging');
+                            }
+                            termPanel.style.left = left + 'px';
+                            termPanel.style.top = top + 'px';
+                        };
+                        const onUp = function () {
+                            window.removeEventListener('pointermove', onMove);
+                            window.removeEventListener('pointerup', onUp);
+                            termPanel.classList.remove('dragging');
+                            if (moved) termSavePos();
+                        };
+                        window.addEventListener('pointermove', onMove);
+                        window.addEventListener('pointerup', onUp);
+                    });
+                }
+                termLoadPos();
+                termSyncShowBtn();
             }
             const sessionAlert = document.getElementById('sessionAlert');
             document.getElementById('alertConfirmBtn').addEventListener('click', () => window.location.replace(BASE_PATH + '/'));
