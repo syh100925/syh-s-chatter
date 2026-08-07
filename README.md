@@ -96,6 +96,59 @@ server {
 
 ---
 
+## 📦 自动发布（GitHub Release）
+
+`.github/workflows/build-release.yml` 会自动构建 **自解压归档** `syh-s-chatter.run`（含完整项目 + 已打包的运行时依赖 + 启动脚本），通过冒烟测试后发布到 GitHub Releases。
+
+### 产物说明
+
+- **依赖已内置**（`deps/`，pip `--target` 安装的纯 Python 包，可跨解释器版本移植），目标机**无需** `pip install -r requirements.txt`
+- **目标机需安装 python3**：为控制体积未打包 Python 解释器（可节省 30-80MB）
+- 发布前工作流自动执行冒烟测试（解压 → 依赖导入 → 服务启动 5 秒），失败则不会发布
+
+### 触发发布
+
+**方式一：推送版本标签（推荐）**
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+推送 `v*` 标签即触发构建；Release 版本号 = 标签名，变更日志自动生成（该标签起的提交）。
+
+**方式二：手动触发（Actions 页面）**
+
+1. 打开仓库 **Actions** → **Build Self-Extracting Release** → **Run workflow**
+2. **Version tag** 输入框：填写版本号（如 `v1.1.0`）；留空则自动生成 `v<时间戳>`（如 `v20260807183815`）
+3. 点击 **Run workflow** 等待构建完成
+
+> ⚠️ 手动触发填写的 tag 若已存在（包括之前发布过的）会发布失败，每次请使用全新版本号。
+
+### 使用产物
+
+```bash
+# 在 Release 页面 Assets 处下载 syh-s-chatter.run
+chmod +x syh-s-chatter.run
+./syh-s-chatter.run          # 解压到当前目录并直接启动服务
+```
+
+- 直接解压到**当前目录**并启动，首次访问 `http://<服务器IP>:5000` 进入初始化向导
+- 旧版本更新时，在相同目录重新执行即可（同名文件被覆盖，`static/uploads/` 等数据保留）
+
+### 编辑 Release 详细信息
+
+发布后可在 Releases 页面继续完善：
+
+| 操作 | 方法 |
+| --- | --- |
+| 补充标题 / 发布说明 | Release 右上角 **Edit**，填写版本亮点、更新日志、使用说明等 |
+| 修改/覆盖自动生成的变更日志 | 同上，Body 中删除自动内容后手写 |
+| 设为最新 / 置顶 | Edit 页勾选 **Set as latest release** |
+| 删除发布 | **Delete**；已发布资产需先移除，随后在 **Tags** 页删除 tag（否则 tag 会残留） |
+
+---
+
 ## 🧱 架构（v2 模块化）
 
 代码组织为可嵌入的 `chatter` 包：

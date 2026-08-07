@@ -7,61 +7,124 @@ on:
   workflow_dispatch:         # 允许手动触发
     inputs:
       version:
-        description: 'Version tag (e.g., v1.0.0)'
-        required: true
-        default: 'v0.0.0'
+        description: 'Version tag (e.g., v1.0.0). Leave empty to auto-generate.'
+        required: false
+        default: ''
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: write        # 允许创建 Release 和上传资产
+      actions: write         # 允许上传工作流产物
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # 安装 makeself（Ubuntu 官方源提供）
+      # 固定 Python 版本并启用 pip 缓存（依赖为纯 Python 包，可跨解释器版本重定位）
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      # 安装 makeself（Ubuntu 官方源提供；runner 镜像自带最新源列表，无需 update）
       - name: Install makeself
-        run: sudo apt-get update && sudo apt-get install -y makeself
+        run: sudo apt-get install -y makeself
 
-      # 准备打包目录，并根据 .gitignore 排除文件（如果 .gitignore 不存在则使用默认排除）
+      # 准备打包目录，并根据 .gitignore 排除文件（若 .gitignore 不存在则使用默认排除）
       - name: Prepare packaging directory
         run: |
           mkdir package
           # 使用 rsync 复制当前目录所有文件到 package/，同时排除 .gitignore 中的模式
-          # 注意：rsync 的 --exclude-from 需要 .gitignore 文件中每行一个模式
-          # 同时明确排除 .git 和 .github 目录（即使 .gitignore 未列全）
           rsync -av --exclude-from=.gitignore --exclude=.git --exclude=.github ./ package/
-          # 给 server.py 添加执行权限（可选，使启动更直接）
           chmod +x package/server.py
 
+      # 将运行时依赖安装到 package/deps/（pip --target 而非 venv）：
+      # 不绑定解释器路径，解压到任意位置都能用；纯 Python 包在不同 Python 版本间可移植
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --no-cache-dir --no-compile --target package/deps -r requirements.txt
+          # 压缩体积：删除 __pycache__ 与随包携带的测试目录
+          find package/deps -type d -name '__pycache__' -prune -exec rm -rf {} +
+          find package/deps -type d \( -name 'tests' -o -name 'test' \) -prune -exec rm -rf {} +
+
+      # 生成启动脚本：优先使用自带依赖；目标机需已安装 python3
+      # （server.py 无 shebang，不能直接 ./server.py 执行，必须经由脚本启动）
+      - name: Create launcher script
+        run: |
+          cat > package/run.sh <<'EOF'
+          #!/bin/sh
+          SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "error: python3 is required on this system" >&2
+            exit 1
+          fi
+          export PYTHONPATH="$SCRIPT_DIR/deps${PYTHONPATH:+:$PYTHONPATH}"
+          export PYTHONDONTWRITEBYTECODE=1
+          exec python3 "$SCRIPT_DIR/server.py" "$@"
+          EOF
+          chmod +x package/run.sh
+
       # 使用 makeself 生成自解压归档
+      # 格式：makeself [选项] <源目录> <输出文件> <标签> <启动命令>
+      # --gzip 压缩，--notemp 不解压到临时目录（直接解压到当前目录）
       - name: Create self-extracting archive
         run: |
-          # 格式：makeself [选项] <源目录> <输出文件> <标签> <启动命令>
-          # --gzip 压缩，--notemp 不解压到临时目录（直接解压到当前目录）
           makeself --gzip --notemp \
             package \
             syh-s-chatter.run \
             "Syh-S-Chatter Server" \
-            ./server.py
-          # 确保生成的 .run 文件可执行
+            ./run.sh
           chmod +x syh-s-chatter.run
+
+      # 冒烟测试：解压产物，验证依赖可导入、服务可正常启动
+      - name: Smoke test
+        run: |
+          mkdir smoke && cd smoke
+          ../syh-s-chatter.run --noexec
+          export PYTHONPATH="$PWD/deps"
+          python3 -c "import flask, werkzeug, pymongo, mongomock, charset_normalizer; print('deps ok')"
+          if timeout 5 python3 server.py; then
+            echo "error: server exited before timeout (rc=0)"
+            exit 1
+          else
+            rc=$?
+            # 服务运行满 5 秒被 timeout 终止（124）即视为启动成功
+            test "$rc" -eq 124 || { echo "error: server failed with rc=$rc"; exit 1; }
+          fi
+          echo "smoke test passed: server started and ran for 5s"
+
+      # 解析发布版本：手动触发优先使用输入；tag 推送用 tag 名；否则按时间自动生成
+      # （避免旧设计中默认 v0.0.0 重复使用导致 tag 已存在而发布失败）
+      - name: Resolve version
+        id: version
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            echo "tag=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v$(date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
 
       # （可选）上传 .run 文件作为工作流产物，便于调试
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: syh-s-chatter-run
           path: syh-s-chatter.run
 
       # 创建 Release 并上传资产
       - name: Create Release and Upload Asset
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: syh-s-chatter.run
           generate_release_notes: true
-          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          tag_name: ${{ steps.version.outputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
