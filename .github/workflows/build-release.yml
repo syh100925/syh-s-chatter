@@ -70,30 +70,32 @@ jobs:
 
       # 使用 makeself 生成自解压归档
       # 格式：makeself [选项] <源目录> <输出文件> <标签> <启动命令>
-      # --gzip 压缩，--notemp 不解压到临时目录（直接解压到当前目录）
+      # --gzip 压缩；--target . 解压到当前目录（--notemp 实际是保留目录而非扁平解压，
+      # 且默认解压目标是"源目录名"，会让文件落进 ./package/ 子目录，故不用）
       - name: Create self-extracting archive
         run: |
-          makeself --gzip --notemp \
+          makeself --gzip --target . \
             package \
             syh-s-chatter.run \
             "Syh-S-Chatter Server" \
             ./run.sh
           chmod +x syh-s-chatter.run
 
-      # 冒烟测试：解压产物，验证依赖可导入、服务可正常启动
+      # 冒烟测试：解压产物，验证依赖可导入、启动脚本可正常拉起服务
       - name: Smoke test
         run: |
           mkdir smoke && cd smoke
           ../syh-s-chatter.run --noexec
           export PYTHONPATH="$PWD/deps"
           python3 -c "import flask, werkzeug, pymongo, mongomock, charset_normalizer; print('deps ok')"
-          if timeout 5 python3 server.py; then
+          # 走真实用户链路：直接执行启动脚本（验证解压布局 + run.sh + 依赖 + 服务启动）
+          if timeout 5 ./run.sh; then
             echo "error: server exited before timeout (rc=0)"
             exit 1
           else
             rc=$?
             # 服务运行满 5 秒被 timeout 终止（124）即视为启动成功
-            test "$rc" -eq 124 || { echo "error: server failed with rc=$rc"; exit 1; }
+            test "$rc" -eq 124 || { echo "error: launcher failed with rc=$rc"; exit 1; }
           fi
           echo "smoke test passed: server started and ran for 5s"
 
