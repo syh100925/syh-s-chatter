@@ -22,13 +22,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 固定 Python 版本并启用 pip 缓存（依赖为纯 Python 包，可跨解释器版本重定位）
+      # 固定 Python 版本（依赖为纯 Python 包，可跨解释器版本重定位）
+      # 注意：不使用 pip 缓存——安装时用了 --no-cache-dir，缓存目录不存在会导致 job 收尾报错
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
-          cache-dependency-path: requirements.txt
 
       # 安装 makeself（Ubuntu 官方源提供；runner 镜像自带最新源列表，无需 update）
       - name: Install makeself
