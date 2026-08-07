@@ -43,33 +43,46 @@ def delete_attachment(message):
         pass
 
 
-def decode_cpp(raw_bytes):
+def decode_cpp(raw_bytes, label=''):
+    """解码 .cpp 源码字节为文本，返回 (内容, 编码)。
+
+    注意：GB18030 是 GBK/GB2312/Big5 的兼容超集，charset-normalizer 常把
+    大陆 C++ 源码误判为 cp949/cp1252 等，导致中文注释乱码。因此只要检测
+    结果命中常见中文字符集（含 cp949 等误判），一律优先按 gb18030 重解码。
+    """
+    ctx = ('[decode_cpp %s] ' % label) if label else '[decode_cpp] '
+    detected = None
+    decoded = None
     try:
         from charset_normalizer import from_bytes
         match = from_bytes(raw_bytes).best()
         if match is not None:
             detected = (match.encoding or '').lower()
             decoded = str(match)
-            # 短 GB2312 样本与 Big5 难以区分；GB18030 是兼容超集，
-            # 可保持常见大陆 C++ 源码可读。
-            if detected in {'big5', 'cp950', 'gbk', 'gb2312', 'gb18030'}:
-                try:
-                    mainland_text = raw_bytes.decode('gb18030')
-                    if any('\u4e00' <= char <= '\u9fff' for char in mainland_text):
-                        return mainland_text, 'gb18030'
-                except UnicodeDecodeError:
-                    pass
-            return decoded, (match.encoding or 'unknown')
-    except Exception as exc:  # pragma: no cover - dependency/runtime fallback
-        state.logger.warning('charset-normalizer failed: %s', exc)
+    except Exception as exc:
+        state.logger.warning('%scharset-normalizer 编码检测失败，回退 gb18030/utf-8：%s', ctx, exc)
+    if detected in {'big5', 'cp950', 'gbk', 'gb2312', 'gb18030', 'cp949'}:
+        try:
+            mainland_text = raw_bytes.decode('gb18030')
+            if any('\u4e00' <= char <= '\u9fff' for char in mainland_text):
+                state.logger.info('%s检测为 %s，按 gb18030 重解码成功，返回 gb18030', ctx, detected)
+                return mainland_text, 'gb18030'
+            state.logger.info('%s检测为 %s，gb18030 重解码无中文字符，保留原检测结果', ctx, detected)
+        except UnicodeDecodeError as exc:
+            state.logger.warning('%s检测为 %s，但 gb18030 解码失败：%s，保留原检测结果', ctx, detected, exc)
+    if decoded is not None:
+        state.logger.info('%s使用 charset-normalizer 检测结果：%s', ctx, detected)
+        return decoded, (detected or 'unknown')
+    state.logger.warning('%s无可用检测结果，回退 utf-8（replace）', ctx)
     return raw_bytes.decode('utf-8', errors='replace'), 'utf-8'
 
 
 def cpp_path(filename):
-    safe = secure_filename(os.path.basename(filename or ''))
-    if not safe or not safe.lower().endswith('.cpp'):
+    if not filename or not filename.lower().endswith('.cpp'):
         return None
-    path = os.path.abspath(os.path.join(upload_dir(), safe))
+    # 不能用 secure_filename：上传去重后缀形如 "main (1).cpp"（含空格/括号），
+    # 安全化后与磁盘上的真实文件名不一致会导致预览 404。
+    path = os.path.abspath(os.path.join(upload_dir(), os.path.basename(filename)))
     return path if os.path.dirname(path) == os.path.abspath(upload_dir()) else None
 
 

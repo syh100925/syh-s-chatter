@@ -228,8 +228,13 @@ def cpp_preview():
         return auth.json_error('文件不存在或不是 .cpp 文件', 404)
     if os.path.getsize(path) > attachments.CPP_PREVIEW_LIMIT:
         return auth.json_error('文件超过 1MB', 413)
-    with open(path, 'rb') as stream:
-        content, encoding = attachments.decode_cpp(stream.read())
+    try:
+        with open(path, 'rb') as stream:
+            content, encoding = attachments.decode_cpp(stream.read(), label=os.path.basename(path))
+    except Exception as exc:
+        logger.warning('C++ 文件预览解析失败：%s（%s）', os.path.basename(path), exc)
+        return auth.json_error('文件解析失败', 500)
+    logger.info('C++ 文件预览：%s（编码 %s）', os.path.basename(path), encoding)
     return jsonify({'ok': True, 'filename': os.path.basename(path),
                     'content': content, 'encoding': encoding})
 

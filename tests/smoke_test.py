@@ -312,7 +312,37 @@ def main():
         finally:
             shutil.rmtree(tmp4, ignore_errors=True)
 
-        print('OK: 冒烟测试全部通过（15 项 + 前缀场景 A/B + 规范化场景 C/D）')
+        # ============ 场景 E：C++ 预览（GB18030 编码 + 重名去重后缀） ============
+        import io as _io
+        old_static_dir = state.STATIC_DIR
+        tmp_static = os.path.join(tmp, 'static')
+        try:
+            state.STATIC_DIR = tmp_static
+            app5 = create_app(data_dir=tmp)
+            client5 = app5.test_client()
+            r = client5.post('/chatts', data={'username': 'admin', 'password': 'admin123'})
+            assert r.status_code == 200, '登录失败'
+            token5 = extract_token(r.data.decode('utf-8'))
+            cpp_bytes = ('#include <iostream>\n// 中文注释：你好世界\n'
+                         'int main() { return 0; }\n').encode('gbk')
+            names = []
+            for _ in range(2):
+                r = client5.post('/chatts_file', data={
+                    'file': (_io.BytesIO(cpp_bytes), 'main.cpp'),
+                    'username': 'admin', 'update': token5,
+                }, content_type='multipart/form-data')
+                assert r.status_code == 200, 'C++ 文件上传失败'
+                names.append(r.get_json()['message']['content'].split('::file::')[1])
+            assert names[1] == 'main (1).cpp', '重名上传应生成去重后缀'
+            for name in names:
+                r = client5.get('/api/cpp-preview?filename=%s&update=%s' % (name, token5))
+                assert r.status_code == 200, 'C++ 预览失败：%s' % name
+                assert '中文注释' in r.get_json()['content'], \
+                    'GB18030 中文内容应正确解码：%s' % name
+        finally:
+            state.STATIC_DIR = old_static_dir
+
+        print('OK: 冒烟测试全部通过（15 项 + 前缀场景 A/B + 规范化场景 C/D + C++ 预览场景 E）')
         return 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
