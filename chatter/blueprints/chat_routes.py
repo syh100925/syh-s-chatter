@@ -74,6 +74,8 @@ def chat_file():
             reply_to=payload.get('reply_to'),
             message_type=message_type,
             check_mute=False,
+            extra={'file_hash': attachments.hash_file(file_path),
+                   'file_size': os.path.getsize(file_path)},
         )
     except Exception:
         try:
@@ -254,8 +256,7 @@ def emoji_list(username):
 @bp.route('/chat/emoji/static/<username>/<filename>', methods=['GET'])
 def emoji_static(username, filename):
     directory = attachments.emoji_directory(username)
-    from werkzeug.utils import secure_filename
-    safe = secure_filename(filename)
+    safe = attachments.safe_filename(filename)
     if not directory or not safe or safe != filename:
         return auth.json_error('文件不存在', 404)
     return send_from_directory(directory, safe)
@@ -277,8 +278,7 @@ def emoji_upload():
     if not directory:
         return auth.json_error('用户名无效', 400)
     os.makedirs(directory, exist_ok=True)
-    from werkzeug.utils import secure_filename
-    filename = secure_filename(uploaded.filename)
+    filename = attachments.safe_filename(uploaded.filename)
     if not filename:
         return auth.json_error('文件名无效', 400)
     uploaded.save(os.path.join(directory, filename))
@@ -295,8 +295,7 @@ def emoji_delete():
     if target != actor and not permissions.is_admin(actor):
         return auth.json_error('没有权限', 403)
     directory = attachments.emoji_directory(target)
-    from werkzeug.utils import secure_filename
-    filename = secure_filename(payload.get('filename', ''))
+    filename = attachments.safe_filename(payload.get('filename', ''))
     if not directory or not filename:
         return auth.json_error('文件名无效', 400)
     path = os.path.join(directory, filename)

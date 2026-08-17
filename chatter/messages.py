@@ -106,6 +106,8 @@ def serialize_message(doc, index=0):
         'type': infer_message_type(content, doc.get('type'), user),
         'recalled': bool(doc.get('recalled', doc.get('revoked', False))),
         'reply_to': str(doc['reply_to']) if doc.get('reply_to') else None,
+        'file_hash': str(doc['file_hash']) if doc.get('file_hash') else None,
+        'file_size': doc.get('file_size'),
     }
 
 
@@ -166,7 +168,7 @@ def add_system_message(content):
     return serialize_message(document)
 
 
-def add_chat(username, value, d_time=None, reply_to=None, message_type=None, check_mute=True):
+def add_chat(username, value, d_time=None, reply_to=None, message_type=None, check_mute=True, extra=None):
     if check_mute:
         ensure_not_muted(username)
     value = '' if value is None else str(value)
@@ -199,6 +201,8 @@ def add_chat(username, value, d_time=None, reply_to=None, message_type=None, che
         'recalled': False,
         'reply_to': str(reply_to) if reply_to else None,
     }
+    if extra:
+        document.update(extra)
     if not plugin_manager.emit('message_send', document=document, username=username):
         return None  # 被插件拦截
     state.database.insert_one(document)

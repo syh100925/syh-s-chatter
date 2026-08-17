@@ -310,7 +310,7 @@ function can(permission) {
                 win.style.width = '600px';
                 win.style.opacity = '0';
                 win.innerHTML =
-                    `<div class="window-titlebar"><span class="window-title">${title}</span><div class="window-actions"><button class="window-btn copy-content-btn" style="display:none;">复制</button><button class="window-btn download-window-btn" style="display:none;">下载</button><button class="window-btn close-window-btn"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></div></div>${showProgress?'<div class="window-progress"><div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div><div class="progress-text">准备下载...</div></div>':''}<div class="window-content">${html}</div>`;
+                    `<div class="window-titlebar"><span class="window-title">${title}</span><div class="window-actions"><button class="window-btn copy-content-btn" style="display:none;">复制</button><button class="window-btn link-window-btn" style="display:none;">复制链接</button><button class="window-btn download-window-btn" style="display:none;">下载</button><button class="window-btn close-window-btn"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></div></div>${showProgress?'<div class="window-progress"><div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div><div class="progress-text">准备下载...</div></div>':''}<div class="window-content">${html}</div>`;
                 document.body.appendChild(win);
                 if (key) openWindows[key] = win;
                 const titlebar = win.querySelector('.window-titlebar');
@@ -448,6 +448,133 @@ function can(permission) {
 
             function isImageFile(fn) { return IMAGE_EXTS.includes((fn || '').split('.').pop().toLowerCase()); }
 
+            function uploadUrl(filename) {
+                return u('/static/uploads/') + encodeURIComponent(filename);
+            }
+
+            // 文件图标：按扩展名生成彩色图标（无扩展名显示 FILE）
+            const FILE_ICON_COLORS = {
+                image: '#8b5cf6', audio: '#f59e0b', video: '#ef4444', archive: '#eab308',
+                code: '#22c55e', document: '#3b82f6', data: '#14b8a6', exec: '#64748b', default: '#94a3b8'
+            };
+            const FILE_ICON_CATEGORY = {
+                image: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico', 'heic', 'avif', 'tiff', 'raw'],
+                audio: ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac', 'wma', 'opus'],
+                video: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'ts', 'm4v'],
+                archive: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso', 'jar'],
+                code: ['py', 'js', 'ts', 'jsx', 'tsx', 'html', 'css', 'json', 'xml', 'yaml', 'yml', 'sh', 'bat',
+                    'ini', 'cfg', 'conf', 'log', 'java', 'c', 'cpp', 'h', 'hpp', 'php', 'rb', 'go', 'rs', 'swift',
+                    'kt', 'sql', 'lua', 'vue', 'md', 'pl', 'ps1', 'dockerfile', 'makefile'],
+                document: ['txt', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'odt', 'epub', 'rtf'],
+                data: ['db', 'sqlite', 'dat', 'bak', 'pkl'],
+                exec: ['exe', 'msi', 'apk', 'appimage', 'run', 'bin']
+            };
+
+            function fileIconColor(filename) {
+                const ext = (filename || '').split('.').pop().toLowerCase();
+                for (const key in FILE_ICON_CATEGORY) {
+                    if (FILE_ICON_CATEGORY[key].includes(ext)) return FILE_ICON_COLORS[key];
+                }
+                return FILE_ICON_COLORS.default;
+            }
+
+            // 文件图标：由文件 Hash 种子确定性生成唯一徽章 + 扩展名角标。
+            // 种子化生成（同一 Hash 恒为同一图标，不同 Hash 图标各异）；旧消息无
+            // file_hash 时回退为文件名确定性哈希，保证图标稳定。
+            function hashToSeed(fileHash, filename) {
+                const name = filename || '';
+                if (fileHash && /^[0-9a-fA-F]{8}/.test(fileHash)) {
+                    return parseInt(fileHash.slice(0, 8), 16) >>> 0;
+                }
+                let h = 1779033703 ^ name.length;
+                for (let i = 0; i < name.length; i++) {
+                    h = Math.imul(h ^ name.charCodeAt(i), 3432918353);
+                    h = (h << 13) | (h >>> 19);
+                }
+                return (h ^ (h >>> 16)) >>> 0;
+            }
+
+            function mulberry32(seed) {
+                let a = seed >>> 0;
+                return function() {
+                    a = (a + 0x6D2B79F5) >>> 0;
+                    let t = a;
+                    t = Math.imul(t ^ (t >>> 15), t | 1);
+                    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+                };
+            }
+
+            // 生成式徽章：由种子决定层数、顶点数、半径、抖动、旋转与色相，
+            // 同一种子恒输出同一 SVG（确定性），不同种子图案各异。
+            // 生成式图标：点阵像素。由种子决定网格尺寸、点亮密度、洗牌顺序与色相，
+            // 同一种子恒输出同一矩阵（确定性），不同种子图案各异。
+            function fileEmblemSvg(seed, accentColor) {
+                const rand = mulberry32(seed);
+                const hue = Math.floor(rand() * 360);
+                const sat = 55 + Math.floor(rand() * 25);
+                const light = 52 + Math.floor(rand() * 16);
+                const primary = `hsl(${hue} ${sat}% ${light}%)`;
+                const parts = [];
+                parts.push(`<rect width="48" height="48" rx="10" fill="hsl(${hue} ${sat}% ${18 + Math.floor(rand() * 8)}%)"/>`);
+                const grid = 4 + Math.floor(rand() * 3);
+                const dotRadius = 1.9 + rand() * 0.9;
+                const margin = 6;
+                const positions = [];
+                for (let row = 0; row < grid; row++) {
+                    for (let col = 0; col < grid; col++) {
+                        positions.push({
+                            x: margin + (48 - margin * 2) * (col / (grid - 1)),
+                            y: margin + (48 - margin * 2) * (row / (grid - 1))
+                        });
+                    }
+                }
+                for (let i = positions.length - 1; i > 0; i--) {
+                    const j = Math.floor(rand() * (i + 1));
+                    const swap = positions[i];
+                    positions[i] = positions[j];
+                    positions[j] = swap;
+                }
+                const litCount = Math.max(3, Math.floor(positions.length * (0.4 + rand() * 0.2)));
+                const accentCount = 1 + Math.floor(rand() * 2);
+                for (let i = 0; i < positions.length; i++) {
+                    const p = positions[i];
+                    if (i < litCount) {
+                        const color = i < accentCount ? accentColor : primary;
+                        parts.push(`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dotRadius.toFixed(2)}" fill="${color}"/>`);
+                    } else {
+                        parts.push(`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dotRadius.toFixed(2)}" fill="${primary}" opacity="0.10"/>`);
+                    }
+                }
+                return `<svg class="file-emblem" viewBox="0 0 48 48" aria-hidden="true">${parts.join('')}</svg>`;
+            }
+
+            function fileExtensionLabel(filename) {
+                const dot = (filename || '').lastIndexOf('.');
+                return dot > 0 ? filename.slice(dot + 1).slice(0, 5).toUpperCase() : 'FILE';
+            }
+
+            function fileIconHtml(filename, fileHash) {
+                const seed = hashToSeed(fileHash, filename);
+                const color = fileIconColor(filename);
+                return `<span class="file-icon" style="--file-icon-color:${color};">${fileEmblemSvg(seed, color)}<span class="file-ext-badge">${escapeHtml(fileExtensionLabel(filename))}</span></span>`;
+            }
+
+            function formatBytes(bytes) {
+                const value = Number(bytes);
+                if (!Number.isFinite(value) || value < 0) return '';
+                if (value < 1024) return Math.round(value) + ' B';
+                const units = ['KB', 'MB', 'GB', 'TB'];
+                let amount = value;
+                let unit = '';
+                for (const name of units) {
+                    amount /= 1024;
+                    unit = name;
+                    if (amount < 1024) break;
+                }
+                return (amount >= 100 ? amount.toFixed(0) : amount.toFixed(1)) + ' ' + unit;
+            }
+
             function fileDownload(url, filename) {
                 const a = document.createElement('a');
                 a.href = url;
@@ -457,7 +584,13 @@ function can(permission) {
                 a.remove();
             }
 
-            function openFileWindow(url, filename) {
+            function setupWindowLinkButton(win, url) {
+                const button = win.querySelector('.link-window-btn');
+                button.style.display = 'inline-block';
+                button.onclick = () => copyToClipboard(location.origin + url).then(showCopyToast).catch(() => alert('复制失败'));
+            }
+
+            function openFileWindow(url, filename, fileHash) {
                 if (openWindows[url]) {
                     focusWindow(openWindows[url]);
                     return;
@@ -469,6 +602,7 @@ function can(permission) {
                     const dw = w.querySelector('.download-window-btn');
                     dw.style.display = 'inline-block';
                     dw.onclick = () => fileDownload(url, filename);
+                    setupWindowLinkButton(w, url);
                     openWindows[url] = w;
                     return;
                 }
@@ -480,6 +614,7 @@ function can(permission) {
                     const dw = w.querySelector('.download-window-btn');
                     dw.style.display = 'inline-block';
                     dw.onclick = () => fileDownload(url, filename);
+                    setupWindowLinkButton(w, url);
                     openWindows[url] = w;
                     fetch(u('/api/cpp-preview?filename=' + encodeURIComponent(filename) + '&update=' + encodeURIComponent(upd)))
                         .then(response => response.ok ? response.json() : response.json().then(body => Promise.reject(body)))
@@ -506,6 +641,7 @@ function can(permission) {
                     const dw = w.querySelector('.download-window-btn');
                     dw.style.display = 'inline-block';
                     dw.onclick = () => fileDownload(url, filename);
+                    setupWindowLinkButton(w, url);
                     openWindows[url] = w;
                     let xhr = new XMLHttpRequest();
                     xhr.open('GET', url, true);
@@ -560,7 +696,7 @@ function can(permission) {
                 const w = createDraggableWindow(filename, '', false, url);
                 const cd = w.querySelector('.window-content');
                 cd.innerHTML =
-                    `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:200px; gap:20px;"><p style="color: var(--fg-muted);">不支持在线预览</p><button class="window-btn download-btn">下载文件</button></div>`;
+                    `<div class="file-unsupported">${fileIconHtml(filename, fileHash)}<span class="file-unsupported-name" title="${escapeHtml(filename)}">${escapeHtml(filename)}</span><p style="color: var(--fg-muted); margin:0;">不支持在线预览</p><button class="window-btn download-btn">下载文件</button></div>`;
                 w.querySelector('.download-btn').addEventListener('click', () => { const a = document.createElement(
                         'a');
                     a.href = url;
@@ -571,6 +707,7 @@ function can(permission) {
                 const dw = w.querySelector('.download-window-btn');
                 dw.style.display = 'inline-block';
                 dw.onclick = () => fileDownload(url, filename);
+                setupWindowLinkButton(w, url);
                 openWindows[url] = w;
             }
 
@@ -850,11 +987,97 @@ function can(permission) {
 
             const fileInput = document.getElementById('file-input');
             const filePickerBtn = document.getElementById('filePickerBtn');
+            const fileCards = document.getElementById('fileCards');
+            let pendingFiles = [];
+
+            // 将待发送文件数组同步回 fileInput.files（发送流程读取该值）
+            function syncFileInput() {
+                try {
+                    const transfer = new DataTransfer();
+                    pendingFiles.forEach(f => transfer.items.add(f));
+                    fileInput.files = transfer.files;
+                } catch (_) { /* 旧浏览器不支持写入时仅保留数组 */ }
+            }
+
+            function renderFileCards() {
+                if (!fileCards) return;
+                fileCards.replaceChildren();
+                pendingFiles.forEach((file, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'file-card';
+                    card.innerHTML = fileIconHtml(file.name, null);
+                    const info = document.createElement('span');
+                    info.className = 'file-card-info';
+                    const name = document.createElement('span');
+                    name.className = 'file-card-name';
+                    name.textContent = file.name;
+                    name.title = file.name;
+                    const meta = document.createElement('span');
+                    meta.className = 'file-card-meta';
+                    meta.textContent = formatBytes(file.size);
+                    info.append(name, meta);
+                    const remove = document.createElement('button');
+                    remove.type = 'button';
+                    remove.className = 'file-card-remove';
+                    remove.title = '移除文件';
+                    remove.setAttribute('aria-label', '移除 ' + file.name);
+                    remove.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>';
+                    remove.addEventListener('click', () => {
+                        pendingFiles.splice(index, 1);
+                        syncFileInput();
+                        renderFileCards();
+                    });
+                    card.append(info, remove);
+                    fileCards.appendChild(card);
+                });
+                fileCards.style.display = pendingFiles.length ? '' : 'none';
+            }
+
             filePickerBtn.addEventListener('click', () => { if (!isMuted()) fileInput.click(); });
             fileInput.addEventListener('change', function() {
-                const filename = this.files[0] ? this.files[0].name : '';
-                document.getElementById('fileHint').textContent = filename ? '已选择: ' + filename : '';
+                pendingFiles = Array.from(this.files || []);
+                syncFileInput();
+                renderFileCards();
             });
+
+            // ---- 文件拖放：拖入文件填入待发送区（不自动发送） ----
+            const chatArea = document.getElementById('chat');
+            let dragDepth = 0;
+
+            function isFileDrag(event) {
+                return event.dataTransfer && Array.prototype.indexOf.call(event.dataTransfer.types || [], 'Files') !== -1;
+            }
+
+            chatArea.addEventListener('dragenter', function(e) {
+                if (isMuted() || !isFileDrag(e)) return;
+                e.preventDefault();
+                dragDepth++;
+                chatArea.classList.add('drag-over');
+            });
+            chatArea.addEventListener('dragover', function(e) {
+                if (isMuted() || !isFileDrag(e)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+            });
+            chatArea.addEventListener('dragleave', function(e) {
+                if (!isFileDrag(e)) return;
+                dragDepth = Math.max(0, dragDepth - 1);
+                if (dragDepth === 0) chatArea.classList.remove('drag-over');
+            });
+            chatArea.addEventListener('drop', function(e) {
+                dragDepth = 0;
+                chatArea.classList.remove('drag-over');
+                if (isMuted() || !isFileDrag(e)) return;
+                e.preventDefault();
+                const files = e.dataTransfer.files;
+                if (!files || !files.length) return;
+                pendingFiles = Array.from(files);
+                syncFileInput();
+                renderFileCards();
+            });
+            // 阻止在聊天区域外误拖放导致浏览器打开文件
+            window.addEventListener('dragover', function(e) { if (isFileDrag(e)) e.preventDefault(); });
+            window.addEventListener('drop', function(e) { if (isFileDrag(e)) e.preventDefault(); });
 
             function formatRemaining(seconds) {
                 const hours = Math.floor(seconds / 3600);
@@ -994,13 +1217,12 @@ function can(permission) {
                     e.preventDefault();
                     if (isSending || isMuted()) return;
                     const text = $('#upft').val();
-                    const file = fileInput.files[0];
-                    if (!text.trim() && !file) return;
+                    const files = pendingFiles.slice();
+                    if (!text.trim() && !files.length) return;
                     isSending = true;
                     stopPolling();
                     const replyId = pendingReply ? pendingReply.id : '';
-                    const uploadFile = function(done) {
-                        if (!file) { done(true); return; }
+                    const uploadOne = function(file, done) {
                         const fd = new FormData();
                         fd.append('file', file);
                         fd.append('username', currentUser);
@@ -1011,15 +1233,28 @@ function can(permission) {
                             type: 'POST', data: fd, processData: false, contentType: false,
                             success: function(body) {
                                 upd = body.update || upd;
-                                fileInput.value = '';
-                                document.getElementById('fileHint').textContent = '';
                                 if (body && body.message) echoSentMessage(body.message);
                                 done(true);
                             },
                             error: function(xhr) { handleAjaxError(xhr, '文件上传失败'); done(false); }
                         });
                     };
-                    uploadFile(function(fileOk) {
+                    const uploadAll = function(done) {
+                        if (!files.length) { done(true); return; }
+                        let index = 0;
+                        const next = function(ok) {
+                            if (!ok) { done(false); return; }
+                            index++;
+                            if (index >= files.length) { done(true); return; }
+                            uploadOne(files[index], next);
+                        };
+                        uploadOne(files[0], next);
+                    };
+                    uploadAll(function(fileOk) {
+                        fileInput.value = '';
+                        pendingFiles = [];
+                        syncFileInput();
+                        renderFileCards();
                         if (!fileOk) { isSending = false; startPolling(); return; }
                         if (!text.trim()) {
                             clearReply();
@@ -1286,6 +1521,7 @@ function can(permission) {
             let selectMode = false;
             let selectedIds = new Set(); // 存储选中消息的 id
             const messageCache = new Map();
+            const renderedMsgIds = new Set();
 
             // ---- 消息分段渲染状态 ----
             const SEGMENT_SIZE = 200;     // 每次渲染的最大消息条数
@@ -1389,7 +1625,9 @@ function can(permission) {
                         content,
                         type: message.type || inferClientMessageType(content, message.user),
                         recalled: Boolean(message.recalled || message.revoked),
-                        reply_to: message.reply_to ? String(message.reply_to) : null
+                        reply_to: message.reply_to ? String(message.reply_to) : null,
+                        file_hash: message.file_hash ? String(message.file_hash) : null,
+                        file_size: message.file_size != null ? Number(message.file_size) : null
                     };
                 }).filter(message => message.user);
                 return {
@@ -1444,7 +1682,7 @@ function can(permission) {
             }
 
             function appendRichText(parent, raw, isOwn) {
-                const urlPattern = /https?:\/\/[^\s<>"'，。！？、]+/gi;
+                const urlPattern = /(?:https?:\/\/|www\.)[^\s<>"'，。！？、]+/gi;
                 let cursor = 0, match;
                 while ((match = urlPattern.exec(raw))) {
                     let value = match[0], trailing = '';
@@ -1453,9 +1691,10 @@ function can(permission) {
                         value = value.slice(0, -1);
                     }
                     appendMentionText(parent, raw.slice(cursor, match.index), isOwn);
+                    const href = /^www\./i.test(value) ? 'http://' + value : value;
                     const isPure = !raw.slice(0, match.index).trim() && !raw.slice(match.index + match[0].length).trim();
-                    if (isPure && isLikelyImageUrl(value)) parent.appendChild(createRemoteImageLink(value));
-                    else parent.appendChild(createExternalLink(value, value));
+                    if (isPure && isLikelyImageUrl(href)) parent.appendChild(createRemoteImageLink(href));
+                    else parent.appendChild(createExternalLink(href, value));
                     if (trailing) appendMentionText(parent, trailing, isOwn);
                     cursor = match.index + match[0].length;
                 }
@@ -1522,7 +1761,7 @@ function can(permission) {
                     const link = document.createElement('a');
                     link.href = 'javascript:void(0)';
                     link.className = 'image-preview-link';
-                    link.dataset.src = u('/static/uploads/') + encodeURIComponent(filename);
+                    link.dataset.src = uploadUrl(filename);
                     link.dataset.filename = filename;
                     const image = document.createElement('img');
                     image.src = link.dataset.src;
@@ -1534,7 +1773,7 @@ function can(permission) {
                 } else if (message.type === 'audio') {
                     const audio = document.createElement('audio');
                     audio.controls = true;
-                    audio.src = u('/static/uploads/') + encodeURIComponent(filename);
+                    audio.src = uploadUrl(filename);
                     parent.appendChild(audio);
                 } else if (message.type === 'emoji') {
                     const image = document.createElement('img');
@@ -1551,10 +1790,21 @@ function can(permission) {
                 } else {
                     const link = document.createElement('a');
                     link.href = 'javascript:void(0)';
-                    link.className = 'file-link rich-link';
-                    link.dataset.url = u('/static/uploads/') + encodeURIComponent(filename);
+                    link.className = 'file-link file-link-plain rich-link';
+                    link.dataset.url = uploadUrl(filename);
                     link.dataset.filename = filename;
-                    link.textContent = '[文件] ' + filename;
+                    link.dataset.fileHash = message.file_hash || '';
+                    const name = document.createElement('span');
+                    name.className = 'file-name';
+                    name.textContent = filename;
+                    name.title = filename;
+                    link.appendChild(name);
+                    if (message.file_size != null) {
+                        const meta = document.createElement('span');
+                        meta.className = 'file-meta';
+                        meta.textContent = formatBytes(message.file_size);
+                        link.appendChild(meta);
+                    }
                     parent.appendChild(link);
                 }
             }
@@ -1563,7 +1813,7 @@ function can(permission) {
                 document.querySelectorAll('#message-list .file-link').forEach(link => {
                     link.addEventListener('click', event => {
                         event.preventDefault();
-                        openFileWindow(link.dataset.url, link.dataset.filename);
+                        openFileWindow(link.dataset.url, link.dataset.filename, link.dataset.fileHash);
                     });
                 });
                 document.querySelectorAll('#message-list .image-preview-link').forEach(link => {
@@ -1632,6 +1882,7 @@ function can(permission) {
                 }
                 let lastTimestamp = null;
                 const windowMessages = payload.messages.slice(windowStart);
+                const previousIds = new Set(renderedMsgIds);
                 windowMessages.forEach((message, index) => {
                     const timestamp = messageMs(message);
                     if (timestamp && (index === 0 || (lastTimestamp !== null && (timestamp - lastTimestamp) / 1000 > TIME_THRESHOLD))) {
@@ -1646,8 +1897,10 @@ function can(permission) {
 
                     const li = document.createElement('li');
                     li.dataset.msgId = message.id;
+                    const isNewMessage = previousIds.size > 0 && !previousIds.has(message.id);
                     if (message.type === 'system') {
                         li.className = 'system-row';
+                        if (isNewMessage) li.classList.add('message-enter');
                         const systemText = document.createElement('p');
                         systemText.className = 'system-message-item';
                         systemText.textContent = message.content === 'clear' ? '--- 管理员清除了日志 ---' : message.content;
@@ -1657,6 +1910,7 @@ function can(permission) {
                     }
                     const isOwn = message.user === currentUser;
                     if (isOwn) li.classList.add('own-message');
+                    if (isNewMessage) li.classList.add('message-enter');
                     const avatar = document.createElement('div');
                     avatar.className = 'msg-avatar';
                     avatar.dataset.user = message.user;
@@ -1713,6 +1967,8 @@ function can(permission) {
                     }
                     list.appendChild(li);
                 });
+                renderedMsgIds.clear();
+                windowMessages.forEach(message => renderedMsgIds.add(message.id));
                 bindMessageLinks();
                 updateSelectedCount();
                 if (shouldStick) {
@@ -1864,6 +2120,17 @@ function can(permission) {
                 copyToClipboard(text).then(showCopyToast).catch(() => alert('复制失败'));
             }
 
+            function attachmentDownloadUrl(message) {
+                if (!['file', 'image', 'audio'].includes(message.type)) return null;
+                return uploadUrl(attachmentName(message));
+            }
+
+            function copyAttachmentLink(message) {
+                const url = attachmentDownloadUrl(message);
+                if (!url) return;
+                copyToClipboard(location.origin + url).then(showCopyToast).catch(() => alert('复制失败'));
+            }
+
             function recallContextMessage() {
                 if (!contextMessage) return;
                 const message = contextMessage;
@@ -1883,6 +2150,8 @@ function can(permission) {
                 const menu = document.getElementById('messageMenu');
                 const recallButton = menu.querySelector('[data-action="recall"]');
                 recallButton.style.display = can('message.recall.any') || message.user === currentUser ? 'block' : 'none';
+                const copyLinkButton = menu.querySelector('[data-action="copy-link"]');
+                copyLinkButton.style.display = ['file', 'image', 'audio'].includes(message.type) ? 'block' : 'none';
                 // 插件菜单项：markdown 插件提供「显示原文/显示Markdown」切换
                 const mdButton = menu.querySelector('[data-action="md-toggle"]');
                 const pluginEntry = pluginMessageMenuEntry(message);
@@ -1928,6 +2197,9 @@ function can(permission) {
                     hideActionMenus();
                 } else if (action === 'copy') {
                     copyMessage(contextMessage);
+                    hideActionMenus();
+                } else if (action === 'copy-link') {
+                    copyAttachmentLink(contextMessage);
                     hideActionMenus();
                 } else if (action === 'recall') {
                     recallContextMessage();
@@ -2047,7 +2319,9 @@ function can(permission) {
                                 color: message.color || '#666',
                                 time: message.time || '',
                                 type: message.type,
-                                recalled: message.recalled
+                                recalled: message.recalled,
+                                file_hash: message.file_hash,
+                                file_size: message.file_size
                             });
                         }
                     });
@@ -2086,17 +2360,18 @@ function can(permission) {
                     const raw = msg.content;
                     if (raw.slice(0, 8) === '::file::') {
                         const fn = raw.substr(8);
+                        const meta = msg.file_size != null ? `<span class="file-meta">${formatBytes(msg.file_size)}</span>` : '';
                         contentHtml =
-                            `<a href="javascript:void(0);" class="file-link" style="color:var(--link-color);text-decoration:none;">[文件] ${fn}</a>`;
+                            `<a href="javascript:void(0);" class="file-link" style="color:var(--link-color);text-decoration:none;">${fileIconHtml(fn, msg.file_hash)}<span class="file-info"><span class="file-name">${escapeHtml(fn)}</span>${meta}</span></a>`;
                         single = (raw.trim() === '::file::' + fn);
                     } else if (raw.slice(0, 7) === '::img::') {
                         const iname = raw.substr(7);
                         contentHtml =
-                            `<a href="javascript:void(0);" class="image-preview-link"><img src="./static/uploads/${iname}" style="max-width:180px;"></a>`;
+                            `<a href="javascript:void(0);" class="image-preview-link"><img src="${u('/static/uploads/')}${encodeURIComponent(iname)}" style="max-width:180px;"></a>`;
                         single = (raw.trim() === '::img::' + iname);
                     } else if (raw.slice(0, 7) === '::wav::') {
                         const wn = raw.substr(7);
-                        contentHtml = `<audio controls src="./static/uploads/${wn}" style="width:100%;"></audio>`;
+                        contentHtml = `<audio controls src="${u('/static/uploads/')}${encodeURIComponent(wn)}" style="width:100%;"></audio>`;
                         single = (raw.trim() === '::wav::' + wn);
                     } else if (raw.slice(0, 9) === '::emoji::') {
                         const emojiName = raw.substr(9);

@@ -76,6 +76,7 @@
     <div class="message-menu" id="messageMenu" role="menu">
         <button type="button" data-action="reply"><svg class="icon" aria-hidden="true"><use href="#i-corner-up-left"/></svg> 回复</button>
         <button type="button" data-action="copy"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg> 复制</button>
+        <button type="button" data-action="copy-link" style="display:none"><svg class="icon" aria-hidden="true"><use href="#i-link"/></svg> 复制链接</button>
         <button type="button" data-action="recall"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> 撤回</button>
         <button type="button" data-action="md-toggle" id="mdToggleBtn" style="display:none"></button>
     </div>
@@ -120,25 +121,25 @@
                 <span class="reply-compose-text" id="replyComposeText"></span>
                 <button type="button" id="cancelReplyBtn" aria-label="取消回复"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
             </div>
-            <div class="input-row">
-                <div class="text-field">
-                    <textarea name="upload_value" id="upft" placeholder="输入文字..." rows="1"></textarea>
-                    <div class="warning-hint" id="warningHint" style="display:none;"></div>
-                    <div class="autocomplete-menu"></div>
-                </div>
-                <div class="file-field">
+            <div class="composer">
+                <div class="file-cards" id="fileCards" style="display:none;"></div>
+                <div class="composer-main">
                     <button type="button" class="file-picker-button" id="filePickerBtn" title="选择文件" aria-label="选择文件">
-                        <img src="{{ base_path }}/static/upload.png" alt="">
+                        <svg class="icon" aria-hidden="true"><use href="#i-paperclip"/></svg>
                     </button>
-                    <input type="file" name="file" id="file-input" hidden>
-                </div>
-                <div class="send-btn">
-                    <button type="button" id="sendBtn">发送</button>
-                    <button type="button" class="text-file-send-btn" id="textFileSendBtn" title="发送文本文件"><svg class="icon" aria-hidden="true"><use href="#i-file-text"/></svg></button>
-                    <button type="button" class="emoji-input-btn" id="emojiInputBtn" title="表情包"><svg class="icon" aria-hidden="true"><use href="#i-smile"/></svg></button>
+                    <input type="file" name="file" id="file-input" multiple hidden>
+                    <div class="text-field">
+                        <textarea name="upload_value" id="upft" placeholder="输入文字..." rows="1"></textarea>
+                        <div class="warning-hint" id="warningHint" style="display:none;"></div>
+                        <div class="autocomplete-menu"></div>
+                    </div>
+                    <div class="composer-tools">
+                        <button type="button" class="text-file-send-btn" id="textFileSendBtn" title="发送文本文件"><svg class="icon" aria-hidden="true"><use href="#i-file-text"/></svg></button>
+                        <button type="button" class="emoji-input-btn" id="emojiInputBtn" title="表情包"><svg class="icon" aria-hidden="true"><use href="#i-smile"/></svg></button>
+                    </div>
+                    <button type="button" id="sendBtn" title="发送" aria-label="发送"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg></button>
                 </div>
             </div>
-            <div class="filename-hint" id="fileHint"></div>
         </div>
     </div>
 

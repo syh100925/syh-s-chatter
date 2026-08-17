@@ -78,13 +78,14 @@
         text = text.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, function (m, label, url) {
             return safeLink(label, url);
         });
-        text = text.replace(/(^|[\s(])(https?:\/\/[^\s<>"'，。！？、]+)/g, function (m, pre, url) {
+        text = text.replace(/(^|[\s(])((?:https?:\/\/|www\.)[^\s<>"'，。！？、]+)/g, function (m, pre, url) {
             var value = url, trailing = '';
             while (/[.,!?;:)}\]，。！？、]$/.test(value)) {
                 trailing = value.slice(-1) + trailing;
                 value = value.slice(0, -1);
             }
-            return pre + '<a class="rich-link" href="' + value + '" target="_blank" rel="noopener noreferrer">' +
+            var href = /^www\./i.test(value) ? 'http://' + value : value;
+            return pre + '<a class="rich-link" href="' + href + '" target="_blank" rel="noopener noreferrer">' +
                 value + '</a>' + trailing;
         });
         text = mentionify(text);

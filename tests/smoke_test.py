@@ -342,7 +342,55 @@ def main():
         finally:
             state.STATIC_DIR = old_static_dir
 
-        print('OK: 冒烟测试全部通过（15 项 + 前缀场景 A/B + 规范化场景 C/D + C++ 预览场景 E）')
+        # ============ 场景 F：中文文件名上传与访问 ============
+        import io as _io6
+        old_static_dir6 = state.STATIC_DIR
+        tmp_static6 = os.path.join(tmp, 'static')
+        try:
+            state.STATIC_DIR = tmp_static6
+            app6 = create_app(data_dir=tmp)
+            client6 = app6.test_client()
+            r = client6.post('/chatts', data={'username': 'admin', 'password': 'admin123'})
+            assert r.status_code == 200, '登录失败'
+            token6 = extract_token(r.data.decode('utf-8'))
+            text_bytes = '中文内容：你好世界\n'.encode('utf-8')
+            r = client6.post('/chatts_file', data={
+                'file': (_io6.BytesIO(text_bytes), '测试文档.txt'),
+                'username': 'admin', 'update': token6,
+            }, content_type='multipart/form-data')
+            assert r.status_code == 200, '中文文件名上传失败'
+            name = r.get_json()['message']['content'].split('::file::')[1]
+            assert name == '测试文档.txt', '中文文件名应被保留：%r' % name
+            file_hash = r.get_json()['message'].get('file_hash')
+            file_size = r.get_json()['message'].get('file_size')
+            assert file_hash and re.match(r'^[0-9a-f]{64}$', file_hash), \
+                'file_hash 应为 64 位十六进制 SHA-256：%r' % file_hash
+            assert file_size == len(text_bytes), 'file_size 应等于文件字节数：%r' % file_size
+            r = client6.get('/static/uploads/' + name)
+            assert r.status_code == 200, '中文文件名静态访问失败'
+            assert '你好世界' in r.data.decode('utf-8'), '中文文件内容应可下载'
+            import hashlib as _hashlib
+            same = _hashlib.sha256(text_bytes).hexdigest()
+            assert file_hash == same, 'file_hash 应为文件 SHA-256：%r != %r' % (file_hash, same)
+            r2 = client6.post('/chatts_file', data={
+                'file': (_io6.BytesIO(text_bytes), '同名文档.txt'),
+                'username': 'admin', 'update': token6,
+            }, content_type='multipart/form-data')
+            assert r2.status_code == 200, '重复内容上传失败'
+            assert r2.get_json()['message'].get('file_hash') == same, \
+                '相同内容两次上传 file_hash 应一致'
+            r = client6.post('/chat/emoji/upload', data={
+                'file': (_io6.BytesIO(b'x'), '表情包.png'),
+                'username': 'admin', 'update': token6,
+            }, content_type='multipart/form-data')
+            assert r.status_code == 200, '中文表情包文件名上传失败'
+            assert r.get_json()['filename'] == '表情包.png', '中文表情包名应被保留'
+            r = client6.get('/chat/emoji/static/admin/表情包.png')
+            assert r.status_code == 200, '中文表情包静态访问失败'
+        finally:
+            state.STATIC_DIR = old_static_dir6
+
+        print('OK: 冒烟测试全部通过（15 项 + 前缀场景 A/B + 规范化场景 C/D + C++ 预览场景 E + 中文文件名场景 F）')
         return 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

@@ -1,5 +1,7 @@
 """附件上传、C++ 预览与表情包目录。"""
+import hashlib
 import os
+import re
 
 from werkzeug.utils import secure_filename
 
@@ -8,14 +10,45 @@ from . import state
 IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'bmp', 'gif', 'webp', 'svg', 'ico'}
 AUDIO_EXTENSIONS = {'mp3', 'wav', 'flac', 'ogg', 'm4a'}
 CPP_PREVIEW_LIMIT = 1024 * 1024
+_HASH_CHUNK_SIZE = 64 * 1024
+
+# 保留中文/Unicode 字符与常见文件名符号，剔除路径分隔符、控制字符等危险字符
+_UNSAFE_CHARS = re.compile(r'[/\\\x00-\x1f\x7f]')
+_MAX_FILENAME_LENGTH = 150
+
+
+def safe_filename(filename):
+    """保留中文等 Unicode 字符的安全文件名（替代 secure_filename 的中文剥离行为）。
+
+    - 仅取 basename，剔除路径分隔符与控制字符
+    - 去除前导点（隐藏文件）、首尾空白
+    - 过滤后为空则回退 'file'
+    """
+    name = os.path.basename(filename or '')
+    name = _UNSAFE_CHARS.sub('_', name)
+    name = name.strip(' .')
+    name = name[: _MAX_FILENAME_LENGTH]
+    return name or 'file'
 
 
 def upload_dir():
     return os.path.join(state.STATIC_DIR, 'uploads')
 
 
+def hash_file(path):
+    """计算文件 SHA-256 十六进制摘要（分块流式读取，用于生成唯一图标种子）。"""
+    digest = hashlib.sha256()
+    with open(path, 'rb') as stream:
+        while True:
+            chunk = stream.read(_HASH_CHUNK_SIZE)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def safe_upload_path(filename):
-    safe_name = secure_filename(os.path.basename(filename or ''))
+    safe_name = safe_filename(filename)
     if not safe_name or safe_name in {'.', '..'}:
         return None, None
     os.makedirs(upload_dir(), exist_ok=True)
@@ -87,9 +120,17 @@ def cpp_path(filename):
 
 
 def emoji_directory(username):
-    safe_user = secure_filename(username or '')
-    if not safe_user:
-        return None
+    """表情包目录：优先使用保留中文的用户名目录，不存在时回退旧 secure_filename 目录。"""
     root = os.path.abspath(os.path.join(state.STATIC_DIR, 'emoji'))
-    path = os.path.abspath(os.path.join(root, safe_user))
-    return path if os.path.dirname(path) == root else None
+    candidate = None
+    for raw_name in (username, secure_filename(username or '')):
+        if not raw_name:
+            continue
+        path = os.path.abspath(os.path.join(root, raw_name))
+        if os.path.dirname(path) != root:
+            continue
+        if candidate is None:
+            candidate = path
+        if os.path.isdir(path):
+            return path
+    return candidate
