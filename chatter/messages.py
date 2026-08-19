@@ -8,6 +8,9 @@ from . import auth, permissions, plugin_manager, state, users
 MUTE_MIN_SECONDS = 1
 MUTE_MAX_SECONDS = 86400
 
+DEFAULT_PAGE_LIMIT = 200
+MAX_PAGE_LIMIT = 500
+
 
 class MuteError(Exception):
     def __init__(self, muted_until):
@@ -117,7 +120,118 @@ def iter_message_docs():
     return state.database.find().sort('_id', 1)
 
 
+def message_count():
+    return state.database.count_documents({'user': {'$exists': True, '$ne': ''}})
+
+
+def _to_float(value):
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _anchor_cursor(message_id):
+    """将公开消息 id 解析为分页游标 (created_at, _id)；找不到返回 None。
+
+    created_at 可能为 None：表示该消息的 created_at 缺失/为空，排序时位于 null 组
+    （所有数值之前），由 _position 单独处理。
+    """
+    message_id = str(message_id or '')
+    document = state.database.find_one({'id': message_id})
+    if not document and message_id.startswith('legacy-'):
+        # 遗留消息的公开 id 由 _id 派生（legacy-<ObjectId>），并不存在对应的 'id' 字段
+        try:
+            from bson import ObjectId
+            document = state.database.find_one({'_id': ObjectId(message_id[len('legacy-'):])})
+        except Exception:
+            document = None
+    if not document or document.get('_id') is None:
+        return None
+    created_at = document.get('created_at', document.get('timestamp'))
+    if created_at is None:
+        return None, document['_id']
+    return _to_float(created_at), document['_id']
+
+
+def _tie_docs(created_at, user_query):
+    """与 created_at 相同的全部文档（用于补齐同刻消息，_id 比较在 Python 侧完成）。"""
+    docs = list(state.database.find(dict(user_query, created_at=created_at)))
+    return [doc for doc in docs if doc.get('_id') is not None]
+
+
+def _position(user_query, created_at, anchor_id):
+    """锚点在 (created_at, _id) 复合排序中的绝对位置（其前有多少条消息）。
+
+    排序规则（BSON 顺序）：created_at 缺失/为空的文档（null 组）排在最前，
+    null 组内部按 _id 升序；随后才是数值升序。$lt/$gt 不会命中 null 组，
+    因此需要单独统计。
+    """
+    if created_at is None:
+        # 锚点本身属于 null 组：位置 = 同组中 _id 更小的文档数
+        return sum(1 for doc in state.database.find(dict(user_query, created_at=None))
+                   if doc.get('_id') is not None and doc['_id'] < anchor_id)
+    null_before = state.database.count_documents(dict(user_query, created_at=None))
+    before_ts = state.database.count_documents(
+        dict(user_query, created_at={'$lt': created_at}))
+    ties_before = sum(1 for doc in _tie_docs(created_at, user_query)
+                      if doc['_id'] < anchor_id)
+    return null_before + before_ts + ties_before
+
+
+def get_message_page(limit=None, before_id=None, after_id=None):
+    """按游标分页返回升序消息列表。
+
+    - 无任何游标（默认）：返回最近 limit 条；
+    - after_id：返回该消息之后（更新）的 limit 条，用于增量轮询；
+    - before_id：返回该消息之前（更早）的 limit 条，用于加载更早消息。
+    返回 (messages, has_more)，has_more 表示是否还存在比返回页首更早的消息。
+    """
+    if limit is None:
+        limit = DEFAULT_PAGE_LIMIT
+    else:
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = DEFAULT_PAGE_LIMIT
+    limit = max(1, min(limit, MAX_PAGE_LIMIT))
+
+    user_query = {'user': {'$exists': True, '$ne': ''}}
+    total = state.database.count_documents(user_query)
+    anchor = (_anchor_cursor(after_id) if after_id
+              else _anchor_cursor(before_id) if before_id else None)
+    if anchor is None:
+        skip = max(0, total - limit)
+        take = min(limit, total)
+        has_more = total > limit
+    elif after_id:
+        skip = _position(user_query, anchor[0], anchor[1]) + 1
+        take = min(limit, max(0, total - skip))
+        has_more = skip > 1
+    else:  # before_id
+        pos = _position(user_query, anchor[0], anchor[1])
+        skip = max(0, pos - limit)
+        take = min(limit, pos)
+        has_more = skip > 0
+
+    if take <= 0:
+        # pymongo/mongomock 中 limit(0) 表示“不限制”，会返回全部文档
+        return [], has_more
+
+    docs = list(state.database.find(user_query)
+                .sort([('created_at', 1), ('_id', 1)])
+                .skip(skip).limit(take))
+
+    messages = []
+    for index, doc in enumerate(docs):
+        if not doc.get('user'):
+            continue
+        messages.append(serialize_message(doc, skip + index))
+    return messages, has_more
+
+
 def get_messages():
+    """返回全部消息（兼容旧调用方；新代码请使用 get_message_page）。"""
     messages = []
     for index, doc in enumerate(iter_message_docs()):
         if not doc.get('user'):

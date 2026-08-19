@@ -18,9 +18,20 @@ def chats():
         return auth.json_error('认证数据错误', 401)
     auth.touch_presence(username)
     state_value = messages.mute_state(username)
+    payload = auth.request_payload()
+    raw_limit = payload.get('limit')
+    if raw_limit is None:
+        raw_limit = request.args.get('limit')
+    message_list, has_more = messages.get_message_page(
+        limit=raw_limit,
+        before_id=payload.get('before') or request.args.get('before'),
+        after_id=payload.get('after') or request.args.get('after'),
+    )
     payload = {
         'ok': True,
-        'messages': messages.get_messages(),
+        'messages': message_list,
+        'has_more': has_more,
+        'total': messages.message_count(),
         'current_user': username,
         'is_admin': permissions.is_admin(username),
         'permissions': permissions.expanded_permissions(username),

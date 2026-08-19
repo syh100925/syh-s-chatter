@@ -1525,9 +1525,14 @@ function can(permission) {
 
             // ---- 消息分段渲染状态 ----
             const SEGMENT_SIZE = 200;     // 每次渲染的最大消息条数
+            const PAGE_LIMIT = 200;       // 服务端分页每页条数
+            const POLL_OVERLAP = 30;      // 增量轮询时携带的重叠条数（同步最近窗口内的撤回/删除）
             let windowStart = 0;          // 当前渲染的第一条消息在 payload.messages 中的下标
             let loadMoreInFlight = false; // 防止连点重复加载
             let suppressStickNextRender = false;
+            let hasMore = false;          // 服务端是否还有更早的消息
+            let totalMessages = 0;        // 服务端消息总数
+            let pollingIncremental = false; // 首次全量加载完成后改用增量轮询
 
             // ---- 获取消息的唯一 ID ----
             function getMsgId(user, content, time) {
@@ -1836,18 +1841,65 @@ function can(permission) {
                 scroll.style.scrollBehavior = prev;
             }
 
+            function mergeMessages(base, payload) {
+                if (!base || !base.messages) return payload;
+                // 锚点本身不会被服务器重发（after 为严格之后），
+                // 因此保留数量不能把锚点算进重叠；列表不足重叠大小时全保留，靠去重吸收重叠
+                const len = base.messages.length;
+                const keepCount = len > POLL_OVERLAP ? len - POLL_OVERLAP : len;
+                const merged = base.messages.slice(0, keepCount);
+                const seen = new Set(merged.map(m => m.id));
+                payload.messages.forEach(m => {
+                    if (!seen.has(m.id)) { merged.push(m); seen.add(m.id); }
+                });
+                return Object.assign({}, payload, {
+                    messages: merged,
+                    current_user: payload.current_user || base.current_user
+                });
+            }
+
             function loadMoreMessages() {
-                if (loadMoreInFlight || windowStart <= 0 || !last_result) return;
-                loadMoreInFlight = true;
-                try {
-                    const payload = normalizePayload(last_result);
-                    if (!payload) return;
-                    windowStart = Math.max(0, windowStart - SEGMENT_SIZE);
-                    suppressStickNextRender = true;
-                    renderMessages(payload);
-                } finally {
-                    loadMoreInFlight = false;
+                if (loadMoreInFlight) return;
+                const payload = last_result && normalizePayload(last_result);
+                if (!payload || !payload.messages.length) return;
+                if (!hasMore) {
+                    // 服务端已无更早数据：仅在本机扩大渲染窗口
+                    loadMoreInFlight = true;
+                    try {
+                        windowStart = Math.max(0, windowStart - SEGMENT_SIZE);
+                        suppressStickNextRender = true;
+                        renderMessages(payload);
+                    } finally {
+                        loadMoreInFlight = false;
+                    }
+                    return;
                 }
+                loadMoreInFlight = true;
+                $.ajax({
+                    url: 'chattss',
+                    type: 'POST',
+                    data: { username: currentUser, update: upd, limit: PAGE_LIMIT, before: payload.messages[0].id },
+                    dataType: 'json',
+                    success: function(body) {
+                        const page = normalizePayload(body);
+                        if (!page || !Array.isArray(page.messages)) return;
+                        const seen = new Set(payload.messages.map(m => m.id));
+                        const older = page.messages.filter(m => !seen.has(m.id));
+                        const merged = Object.assign({}, payload, {
+                            messages: older.concat(payload.messages),
+                            has_more: Boolean(body.has_more),
+                            total: Number(body.total || 0)
+                        });
+                        hasMore = Boolean(body.has_more);
+                        totalMessages = Number(body.total || 0);
+                        suppressStickNextRender = true;
+                        last_result = merged;
+                        lastMessageSignature = JSON.stringify({ messages: merged.messages, muted_until: payload.muted_until });
+                        renderMessages(merged);
+                    },
+                    error: function() { alert('加载更早的消息失败'); },
+                    complete: function() { loadMoreInFlight = false; }
+                });
             }
 
             function renderMessages(result) {
@@ -1869,13 +1921,15 @@ function can(permission) {
                     windowStart = Math.min(windowStart, Math.max(0, total - SEGMENT_SIZE));
                 }
                 list.replaceChildren();
-                if (windowStart > 0) {
+                const remainingServer = hasMore ? Math.max(0, totalMessages - payload.messages.length) : 0;
+                if (windowStart > 0 || remainingServer > 0) {
+                    const remaining = remainingServer > 0 ? remainingServer : windowStart;
                     const sentinelLi = document.createElement('li');
                     sentinelLi.className = 'load-more-row';
                     const loadBtn = document.createElement('button');
                     loadBtn.type = 'button';
                     loadBtn.className = 'load-more-btn';
-                    loadBtn.textContent = '加载更早的消息（还有 ' + windowStart + ' 条）';
+                    loadBtn.textContent = '加载更早的消息（还有 ' + remaining + ' 条）';
                     loadBtn.addEventListener('click', loadMoreMessages);
                     sentinelLi.appendChild(loadBtn);
                     list.appendChild(sentinelLi);
@@ -2000,22 +2054,50 @@ function can(permission) {
             // ---- 更新函数：JSON 协议，保留旧四行响应的兼容解析 ----
             function update() {
                 if (!sessionValid) return;
+                const data = { username: currentUser, update: upd };
+                if (pollingIncremental) {
+                    const list = last_result && last_result.messages;
+                    // after 为严格之后：锚点前移一位，让返回的重叠恰好覆盖 POLL_OVERLAP 条
+                    const anchor = list && list.length > POLL_OVERLAP
+                        ? list[list.length - POLL_OVERLAP - 1].id
+                        : (list && list.length ? list[0].id : null);
+                    if (anchor) {
+                        data.limit = PAGE_LIMIT;
+                        data.after = anchor;
+                    } else {
+                        pollingIncremental = false;
+                    }
+                }
                 $.ajax({
                     url: 'chattss',
                     type: 'POST',
-                    data: { username: currentUser, update: upd },
+                    data: data,
                     dataType: 'json',
                     success: function(body) {
                         const payload = normalizePayload(body);
                         if (!payload) { showSessionAlert(); return; }
                         if (payload.server_time) clockOffset = payload.server_time * 1000 - Date.now();
                         setMuteState(payload.muted_until, payload.server_time);
-                        notifyNewMentions(payload.messages);
-                        const signature = JSON.stringify({ messages: payload.messages, muted_until: payload.muted_until });
-                        last_result = payload;
+                        const incremental = pollingIncremental;
+                        // 数据被清空/删除（总数小于已加载条数）：丢弃缓存全量重取
+                        if (incremental && Number(body.total || 0) < (last_result && last_result.messages.length || 0)) {
+                            pollingIncremental = false;
+                            last_result = null;
+                            lastMessageSignature = '';
+                            update();
+                            return;
+                        }
+                        const merged = incremental ? mergeMessages(last_result, payload) : payload;
+                        // has_more 仅在全量（默认）拉取时有意义；增量轮询不覆盖它
+                        if (!incremental) hasMore = Boolean(body.has_more);
+                        totalMessages = Number(body.total || 0);
+                        notifyNewMentions(merged.messages);
+                        const signature = JSON.stringify({ messages: merged.messages, muted_until: payload.muted_until });
+                        last_result = merged;
+                        pollingIncremental = true;
                         if (signature !== lastMessageSignature) {
                             lastMessageSignature = signature;
-                            renderMessages(payload);
+                            renderMessages(merged);
                         }
                     },
                     error: function(xhr) {

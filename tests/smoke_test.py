@@ -137,6 +137,79 @@ def main():
             'username': 'alice', 'update': alice_token})
         assert r.status_code == 200, '普通用户应能撤回自己的消息'
 
+        # ============ 分段传输：分页查询 ============
+        import uuid as _uuid
+        import time as _time
+        from chatter import messages as _messages
+        # 直插 210 条消息，验证默认只返回最近部分（避免逐条走 HTTP）
+        for i in range(210):
+            state.database.insert_one({
+                'id': _uuid.uuid4().hex, 'chat': 'bulk-%d' % i, 'content': 'bulk-%d' % i,
+                'user': 'bulkuser', 'color': '#123456', 'time': _messages.get_current_time(),
+                'created_at': _time.time(), 'type': 'text', 'recalled': False, 'reply_to': None,
+            })
+        base_total = 5 + 210  # 此前 5 条 + 批量 210 条
+
+        # 默认（不填分页参数）：只返回最近 200 条
+        r = client.post('/chattss', json={'username': 'admin', 'update': admin_token})
+        data = r.get_json()
+        assert data['ok'], 'chattss 响应异常'
+        assert len(data['messages']) == _messages.DEFAULT_PAGE_LIMIT, \
+            '默认应只返回最近 %d 条：%d' % (_messages.DEFAULT_PAGE_LIMIT, len(data['messages']))
+        assert data['has_more'] is True, '存在更早消息时 has_more 应为 True'
+        assert data['total'] == base_total, 'total 应为消息总数：%s' % data['total']
+        assert data['messages'][0]['content'] == 'bulk-10', '默认页应从最近窗口开头'
+        assert data['messages'][-1]['content'] == 'bulk-209', '默认页应以最新消息结尾'
+        default_page = data['messages']
+
+        # limit 参数生效
+        r = client.post('/chattss', json={'username': 'admin', 'update': admin_token, 'limit': 3})
+        data = r.get_json()
+        assert [m['content'] for m in data['messages']] == ['bulk-207', 'bulk-208', 'bulk-209'], \
+            'limit=3 应只返回最近 3 条'
+        assert data['has_more'] is True and data['total'] == base_total
+
+        # 非法/越界 limit 回退：非数字按默认处理，0 下限为 1
+        r = client.post('/chattss', json={'username': 'admin', 'update': admin_token, 'limit': 'abc'})
+        assert len(r.get_json()['messages']) == _messages.DEFAULT_PAGE_LIMIT, '非法 limit 应回退默认'
+        r = client.post('/chattss', json={'username': 'admin', 'update': admin_token, 'limit': 0})
+        assert len(r.get_json()['messages']) == 1, 'limit=0 应回退为 1'
+
+        # after：只返回该消息之后（更新）的消息
+        anchor_id = default_page[-2]['id']  # bulk-208
+        r = client.post('/chattss', json={
+            'username': 'admin', 'update': admin_token, 'after': anchor_id, 'limit': 10})
+        data = r.get_json()
+        assert [m['content'] for m in data['messages']] == ['bulk-209'], 'after 应只返回更新的消息'
+
+        # before：返回该消息之前（更早）的消息，升序且不含锚点
+        r = client.post('/chattss', json={
+            'username': 'admin', 'update': admin_token, 'before': anchor_id, 'limit': 3})
+        data = r.get_json()
+        assert [m['content'] for m in data['messages']] == ['bulk-205', 'bulk-206', 'bulk-207'], \
+            'before 应返回更早消息且升序'
+        assert data['has_more'] is True
+
+        # before 到最早边界：has_more 应为 False
+        oldest_id = default_page[0]['id']  # bulk-10
+        r = client.post('/chattss', json={
+            'username': 'admin', 'update': admin_token, 'before': oldest_id, 'limit': 200})
+        data = r.get_json()
+        assert len(data['messages']) == 15, '更早消息应为 15 条：%d' % len(data['messages'])
+        assert data['messages'][-1]['content'] == 'bulk-9', '更早窗口应以 bulk-9 结尾'
+        assert data['has_more'] is False, '到达最早消息时 has_more 应为 False'
+
+        # 未知游标：回退为默认最近窗口
+        r = client.post('/chattss', json={
+            'username': 'admin', 'update': admin_token, 'before': 'no-such-id', 'limit': 3})
+        assert [m['content'] for m in r.get_json()['messages']] == ['bulk-207', 'bulk-208', 'bulk-209'], \
+            '未知游标应回退为最近窗口'
+
+        # 清理批量消息，避免影响后续场景
+        state.database.delete_many({'user': 'bulkuser'})
+        r = client.post('/chattss', json={'username': 'admin', 'update': admin_token})
+        assert r.get_json()['total'] == 5, '清理后 total 应恢复为 5'
+
         # 11. 禁言 + 禁言后发消息被拒
         r = client.post('/api/mute', json={
             'username': 'admin', 'update': admin_token, 'target': 'alice', 'duration': 60})
