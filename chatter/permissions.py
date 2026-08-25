@@ -5,7 +5,7 @@
 - chat.clear / chat.delete / chat.change_color
 - moderation.mute / moderation.unmute
 - admin.panel / admin.users / admin.groups / admin.plugins
-- admin.traffic / admin.database / admin.settings
+- admin.traffic / admin.database / admin.settings / admin.tools / admin.uploads
 - plugins.<插件名>.<动作>（插件自定义）
 
 权限组配置位于 config.json 的 permission_groups（组名 -> 权限列表，支持通配符，如 "*"、chat.*），
@@ -103,6 +103,7 @@ def all_permission_points():
         'moderation.mute', 'moderation.unmute',
         'admin.panel', 'admin.users', 'admin.groups', 'admin.plugins',
         'admin.traffic', 'admin.database', 'admin.settings', 'admin.tools',
+        'admin.uploads',
     ]
     from . import commands
     for entry in commands.COMMANDS.values():

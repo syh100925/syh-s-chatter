@@ -1,29 +1,40 @@
-{# 管理面板内容片段（聊天室弹窗与独立页共用，交互逻辑见 static/js/admin.js） #}
+{# 管理面板内容片段（聊天室弹窗与独立页共用，交互逻辑见 static/js/admin.js）
+   布局：二级跳转 —— 一级为横向滚动菜单（含代码滚动背景），二级为分区内容 + 返回 #}
 <div class="admin-panel-root">
-    <div class="admin-shell">
-        <nav class="admin-nav" aria-label="管理导航">
-            <button type="button" class="admin-tab active" data-tab="users" title="用户"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg></button>
-            <button type="button" class="admin-tab" data-tab="groups" title="权限组"><svg class="icon" aria-hidden="true"><use href="#i-puzzle"/></svg></button>
-            <button type="button" class="admin-tab" data-tab="plugins" title="插件"><svg class="icon" aria-hidden="true"><use href="#i-power"/></svg></button>
-            <button type="button" class="admin-tab" data-tab="traffic" title="流量"><svg class="icon" aria-hidden="true"><use href="#i-bar-chart"/></svg></button>
-            <button type="button" class="admin-tab" data-tab="database" title="数据库"><svg class="icon" aria-hidden="true"><use href="#i-database"/></svg></button>
-            <button type="button" class="admin-tab" data-tab="settings" title="设置"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></button>
-            <button type="button" class="admin-tab" data-tab="tools" title="快捷工具"><svg class="icon" aria-hidden="true"><use href="#i-link"/></svg></button>
-        </nav>
-        <div class="admin-main">
-            <div class="admin-toast" id="adminToast" hidden></div>
+    <div class="admin-toast" id="adminToast" hidden></div>
+    <div class="admin-stage">
+        <!-- 一级：菜单页 -->
+        <div class="admin-page active" id="adminMenuPage">
+            <nav class="admin-menu-scroll" aria-label="管理导航">
+                <button type="button" class="admin-menu-btn" data-tab="users" style="--stripe-color: #2a6df4;" title="用户"><span class="admin-tab-face"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg><span class="admin-tab-label">用户</span></span></button>
+                <button type="button" class="admin-menu-btn" data-tab="groups" style="--stripe-color: #8b5cf6;" title="权限组"><span class="admin-tab-face"><svg class="icon" aria-hidden="true"><use href="#i-puzzle"/></svg><span class="admin-tab-label">权限组</span></span></button>
+                <button type="button" class="admin-menu-btn" data-tab="plugins" style="--stripe-color: #f45b2a;" title="插件"><span class="admin-tab-face"><svg class="icon" aria-hidden="true"><use href="#i-power"/></svg><span class="admin-tab-label">插件</span></span></button>
+                <button type="button" class="admin-menu-btn admin-menu-btn-uploads" data-tab="uploads" style="--stripe-color: #14b8a6;" title="文件上传"><span class="admin-tab-face"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><span class="admin-tab-label">上传</span></span></button>
+                <button type="button" class="admin-menu-btn" data-tab="traffic" style="--stripe-color: #eab308;" title="流量"><span class="admin-tab-face"><svg class="icon" aria-hidden="true"><use href="#i-bar-chart"/></svg><span class="admin-tab-label">流量</span></span></button>
+                <button type="button" class="admin-menu-btn" data-tab="database" style="--stripe-color: #ef4444;" title="数据库"><span class="admin-tab-face"><svg class="icon" aria-hidden="true"><use href="#i-database"/></svg><span class="admin-tab-label">数据库</span></span></button>
+                <button type="button" class="admin-menu-btn" data-tab="settings" style="--stripe-color: #4caf50;" title="设置"><span class="admin-tab-face"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg><span class="admin-tab-label">设置</span></span></button>
+                <button type="button" class="admin-menu-btn" data-tab="tools" style="--stripe-color: #06b6d4;" title="快捷工具"><span class="admin-tab-face"><svg class="icon" aria-hidden="true"><use href="#i-link"/></svg><span class="admin-tab-label">工具</span></span></button>
+            </nav>
+        </div>
+        <!-- 二级：分区页 -->
+        <div class="admin-page" id="adminSectionPage">
+            <div class="admin-section-bar">
+                <button type="button" class="admin-back-btn" id="adminBackBtn"><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"/></svg> 返回</button>
+                <span class="admin-section-name" id="adminSectionName"></span>
+            </div>
             <div class="admin-tab-pages">
                 <div class="admin-tab-page active" id="tab-users"></div>
                 <div class="admin-tab-page" id="tab-groups"></div>
                 <div class="admin-tab-page" id="tab-plugins"></div>
+                <div class="admin-tab-page" id="tab-uploads"></div>
                 <div class="admin-tab-page" id="tab-traffic"></div>
                 <div class="admin-tab-page" id="tab-database"></div>
                 <div class="admin-tab-page" id="tab-settings"></div>
                 <div class="admin-tab-page" id="tab-tools"></div>
             </div>
-            <div class="admin-footer">
-                <a href="{{ base_path }}/admin?update={{ update }}" target="_blank" rel="noopener">在独立界面中打开 <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
-            </div>
         </div>
+    </div>
+    <div class="admin-footer">
+        <a href="{{ base_path }}/admin?update={{ update }}" target="_blank" rel="noopener">在独立界面中打开 <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
     </div>
 </div>

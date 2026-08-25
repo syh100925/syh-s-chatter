@@ -6,7 +6,7 @@ import string
 
 from flask import jsonify, request
 
-from .. import auth, config, messages, permissions, plugin_manager, state, traffic, users
+from .. import attachments, auth, config, messages, permissions, plugin_manager, state, traffic, users
 from ..state import logger
 from . import make_blueprint
 
@@ -399,6 +399,111 @@ def api_database_clear():
         return error
     state.database.delete_many({})
     messages.add_system_message('管理员清除了聊天记录')
+    return jsonify({'ok': True})
+
+
+# ---------------- 文件上传（static/uploads 管理） ----------------
+
+_UPLOAD_BATCH_LIMIT = 20
+_UPLOAD_MAX_SIZE = 200 * 1024 * 1024  # 单文件 200MB 上限，防止超大文件占满磁盘
+
+
+@bp.route('/admin/api/uploads', methods=['GET'])
+def api_uploads_list():
+    actor, error = _require('admin.uploads')
+    if error:
+        return error
+    root = os.path.abspath(attachments.upload_dir())
+    items = []
+    if os.path.isdir(root):
+        for entry in os.scandir(root):
+            try:
+                if not entry.is_file():
+                    continue
+                stat = entry.stat()
+            except OSError:
+                continue
+            items.append({'name': entry.name, 'size': stat.st_size, 'mtime': int(stat.st_mtime)})
+    items.sort(key=lambda item: item['mtime'], reverse=True)
+    total_size = sum(item['size'] for item in items)
+    return jsonify({
+        'ok': True,
+        'files': items[:500],
+        'total': len(items),
+        'total_size': total_size,
+    })
+
+
+@bp.route('/admin/api/uploads/batch', methods=['POST'])
+def api_uploads_batch():
+    actor, error = _require('admin.uploads')
+    if error:
+        return error
+    files = request.files.getlist('files')
+    if not files:
+        return auth.json_error('没有选择文件', 400)
+    if len(files) > _UPLOAD_BATCH_LIMIT:
+        return auth.json_error('单次最多上传 %d 个文件' % _UPLOAD_BATCH_LIMIT, 400)
+    os.makedirs(attachments.upload_dir(), exist_ok=True)
+    saved, failed = [], []
+    for uploaded in files:
+        original_name = (uploaded.filename or '').strip() if uploaded is not None else ''
+        try:
+            if not original_name:
+                raise ValueError('空文件')
+            upload_path, safe_name = attachments.safe_upload_path(original_name)
+            if not upload_path:
+                raise ValueError('文件名无效')
+            name, extension = os.path.splitext(safe_name)
+            final_name = safe_name
+            counter = 1
+            while os.path.exists(os.path.join(upload_path, final_name)):
+                final_name = '%s (%d)%s' % (name, counter, extension)
+                counter += 1
+            file_path = os.path.join(upload_path, final_name)
+            uploaded.save(file_path)
+            size = os.path.getsize(file_path)
+            if size > _UPLOAD_MAX_SIZE:
+                os.remove(file_path)
+                raise ValueError('文件超过大小限制（%s）' % format_bytes(_UPLOAD_MAX_SIZE))
+            saved.append({'name': final_name, 'size': size})
+        except Exception as exc:
+            failed.append({'name': original_name, 'error': str(exc)})
+    if saved:
+        logger.info('管理员 %s 批量上传了 %d 个文件（失败 %d 个）', actor, len(saved), len(failed))
+    return jsonify({'ok': True, 'saved': saved, 'failed': failed})
+
+
+def format_bytes(n):
+    value = float(n)
+    for unit in ('B', 'KB', 'MB', 'GB', 'TB'):
+        if value < 1024 or unit == 'TB':
+            return ('%d %s' % (value, unit)) if unit == 'B' else ('%.1f %s' % (value, unit))
+        value /= 1024
+
+
+@bp.route('/admin/api/uploads/delete', methods=['POST'])
+def api_uploads_delete():
+    actor, error = _require('admin.uploads')
+    if error:
+        return error
+    payload = auth.request_payload()
+    name = str(payload.get('name') or '').strip()
+    # 拒绝任何带路径成分的名称（含 / \ .. 等），仅允许 uploads 目录顶层的裸文件名
+    if not name or os.path.basename(name) != name or name in {'.', '..'} \
+            or '/' in name or '\\' in name:
+        return auth.json_error('非法路径', 400)
+    root = os.path.abspath(attachments.upload_dir())
+    target = os.path.abspath(os.path.join(root, name))
+    if os.path.dirname(target) != root:
+        return auth.json_error('非法路径', 400)
+    if not os.path.isfile(target):
+        return auth.json_error('文件不存在', 404)
+    try:
+        os.remove(target)
+    except OSError as exc:
+        return auth.json_error('删除失败: %s' % exc, 500)
+    logger.info('管理员 %s 删除了上传文件 %s', actor, name)
     return jsonify({'ok': True})
 
 

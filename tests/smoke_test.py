@@ -463,7 +463,84 @@ def main():
         finally:
             state.STATIC_DIR = old_static_dir6
 
-        print('OK: 冒烟测试全部通过（15 项 + 前缀场景 A/B + 规范化场景 C/D + C++ 预览场景 E + 中文文件名场景 F）')
+        # ============ 场景 G：管理面板批量上传接口（列表/上传/删除/越权/路径穿越） ============
+        old_static_dir7 = state.STATIC_DIR
+        tmp_static7 = os.path.join(tmp, 'static')
+        try:
+            state.STATIC_DIR = tmp_static7
+            app7 = create_app(data_dir=tmp)
+            client7 = app7.test_client()
+            r = client7.post('/chatts', data={'username': 'admin', 'password': 'admin123'})
+            assert r.status_code == 200, '登录失败'
+            token7 = extract_token(r.data.decode('utf-8'))
+
+            # 未认证 → 401
+            r = client7.get('/admin/api/uploads')
+            assert r.status_code == 401, '未认证访问 uploads 列表应被拒绝'
+
+            # 普通用户（alice 无 admin.*）→ 403
+            r = client7.post('/chatts', data={'username': 'alice', 'password': 'alice123'})
+            alice_token7 = extract_token(r.data.decode('utf-8'))
+            r = client7.get('/admin/api/uploads?update=' + alice_token7)
+            assert r.status_code == 403, '无 admin.uploads 权限应被拒绝'
+
+            # 批量上传：2 个文件（含中文名）
+            r = client7.post('/admin/api/uploads/batch?update=' + token7, data={
+                'files': [
+                    (_io6.BytesIO(b'alpha-content'), '报告A.txt'),
+                    (_io6.BytesIO(b'beta-content'), 'beta.bin'),
+                ],
+            }, content_type='multipart/form-data')
+            assert r.status_code == 200 and r.get_json()['ok'], '批量上传失败'
+            body = r.get_json()
+            assert len(body['saved']) == 2 and not body['failed'], \
+                '应成功保存 2 个文件：%r' % body
+            saved_names = {item['name'] for item in body['saved']}
+            assert '报告A.txt' in saved_names and 'beta.bin' in saved_names, \
+                '中文文件名应被保留：%r' % saved_names
+
+            # 重名再传 → 自动去重后缀
+            r = client7.post('/admin/api/uploads/batch?update=' + token7, data={
+                'files': [(_io6.BytesIO(b'alpha-again'), '报告A.txt')],
+            }, content_type='multipart/form-data')
+            dup_name = r.get_json()['saved'][0]['name']
+            assert dup_name == '报告A (1).txt', '重名应生成去重后缀：%r' % dup_name
+
+            # 列表：应包含全部文件与总大小
+            r = client7.get('/admin/api/uploads?update=' + token7)
+            listing = r.get_json()
+            names = {f['name'] for f in listing['files']}
+            assert {'报告A.txt', 'beta.bin', '报告A (1).txt'} <= names, '列表应包含已上传文件'
+            assert listing['total'] >= 3 and listing['total_size'] > 0, '列表统计异常'
+
+            # 路径穿越 → 拒绝
+            r = client7.post('/admin/api/uploads/delete', json={
+                'username': 'admin', 'update': token7, 'name': '../../config.json'})
+            assert r.status_code == 400, '路径穿越应被拒绝'
+
+            # 不存在的文件 → 404
+            r = client7.post('/admin/api/uploads/delete', json={
+                'username': 'admin', 'update': token7, 'name': 'no-such-file.txt'})
+            assert r.status_code == 404, '删除不存在文件应 404'
+
+            # 正常删除 → 文件从磁盘消失
+            r = client7.post('/admin/api/uploads/delete', json={
+                'username': 'admin', 'update': token7, 'name': '报告A (1).txt'})
+            assert r.status_code == 200, '删除文件失败'
+            assert not os.path.exists(os.path.join(tmp_static7, 'uploads', '报告A (1).txt')), \
+                '文件应从磁盘移除'
+            r = client7.get('/admin/api/uploads?update=' + token7)
+            assert '报告A (1).txt' not in {f['name'] for f in r.get_json()['files']}, \
+                '删除后不应出现在列表中'
+
+            # 空请求 → 400
+            r = client7.post('/admin/api/uploads/batch?update=' + token7,
+                             data={}, content_type='multipart/form-data')
+            assert r.status_code == 400, '没有文件时应返回 400'
+        finally:
+            state.STATIC_DIR = old_static_dir7
+
+        print('OK: 冒烟测试全部通过（15 项 + 前缀场景 A/B + 规范化场景 C/D + C++ 预览场景 E + 中文文件名场景 F + 批量上传场景 G）')
         return 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

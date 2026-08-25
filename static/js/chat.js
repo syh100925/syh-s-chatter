@@ -348,6 +348,9 @@ function can(permission) {
             function buildSettingsSubpage(win, page) {
                 const c = win.querySelector('.window-content');
                 c.style.cursor = 'default';
+                // 子页切换方向感知过渡：返回主页左滑入，前进右滑入（首次打开不动画）
+                const prevPage = win._settingsPage || null;
+                win._settingsPage = page;
                 let html = '';
                 if (page === 'main') html =
                     `<div class="settings-menu-container"><button class="settings-menu-btn" data-page="interface" style="--stripe-color: #2a6df4;"><span>界面显示</span></button><button class="settings-menu-btn" data-page="chat" style="--stripe-color: #f45b2a;"><span>聊天样式</span></button><button class="settings-menu-btn" data-page="theme" style="--stripe-color: #4caf50;"><span>主题与代码</span></button></div><div class="code-scroller"><div class="code-scroll-inner">${randomCode()+'\n'+randomCode()}</div></div>`;
@@ -362,6 +365,11 @@ function can(permission) {
                         `<div class="settings-row"><label>主题配色</label><select id="themeSelect"><option value="dark" ${settings.theme==='dark'?'selected':''}>暗色</option><option value="light" ${settings.theme==='light'?'selected':''}>亮色</option></select></div><div class="settings-row"><label>代码高亮</label><select id="highlightSelect"><option value="auto" ${settings.highlightTheme==='auto'?'selected':''}>跟随主题</option><option value="dark" ${settings.highlightTheme==='dark'?'selected':''}>暗色 (One Dark)</option><option value="light" ${settings.highlightTheme==='light'?'selected':''}>亮色 (One Light)</option></select></div>`;
                 }
                 c.innerHTML = html;
+                if (prevPage !== null) {
+                    c.classList.remove('subpage-enter', 'subpage-enter-back');
+                    void c.offsetWidth;   // 重启动画
+                    c.classList.add(page === 'main' ? 'subpage-enter-back' : 'subpage-enter');
+                }
                 c.querySelectorAll('[data-page]').forEach(b => b.addEventListener('click', () => buildSettingsSubpage(win, b
                     .getAttribute('data-page'))));
                 if (page === 'interface') {
@@ -989,6 +997,42 @@ function can(permission) {
             const filePickerBtn = document.getElementById('filePickerBtn');
             const fileCards = document.getElementById('fileCards');
             let pendingFiles = [];
+            const MAX_PENDING_FILES = 20;
+
+            // 追加文件（而非覆盖）：按 文件名+大小+修改时间 去重，超出上限忽略
+            function appendPendingFiles(list) {
+                let added = 0, dup = 0, overflow = 0;
+                Array.from(list || []).forEach(function (f) {
+                    const exists = pendingFiles.some(p =>
+                        p.name === f.name && p.size === f.size && p.lastModified === f.lastModified);
+                    if (exists) { dup++; return; }
+                    if (pendingFiles.length >= MAX_PENDING_FILES) { overflow++; return; }
+                    pendingFiles.push(f);
+                    added++;
+                });
+                syncFileInput();
+                renderFileCards();
+                const parts = [];
+                if (added) parts.push('已添加 ' + added + ' 个文件');
+                if (dup) parts.push(dup + ' 个重复已跳过');
+                if (overflow) parts.push('超出上限 ' + overflow + ' 个未加入（最多 ' + MAX_PENDING_FILES + '）');
+                if (parts.length) showHintToast(parts.join('，') + (overflow || dup ? '' : ''));
+                return { added: added, dup: dup, overflow: overflow };
+            }
+
+            // 轻量提示：复用复制提示条样式
+            let hintToastTimer = null;
+            function showHintToast(text) {
+                const t = document.getElementById('copyToast');
+                if (!t) return;
+                t.textContent = text;
+                t.classList.add('show');
+                clearTimeout(hintToastTimer);
+                hintToastTimer = setTimeout(() => {
+                    t.classList.remove('show');
+                    t.textContent = '复制成功';   // 还原默认文案，避免影响复制提示
+                }, 1800);
+            }
 
             // 将待发送文件数组同步回 fileInput.files（发送流程读取该值）
             function syncFileInput() {
@@ -1030,14 +1074,26 @@ function can(permission) {
                     card.append(info, remove);
                     fileCards.appendChild(card);
                 });
+                // 多于 1 个文件时提供一键清空
+                if (pendingFiles.length > 1) {
+                    const clearAll = document.createElement('button');
+                    clearAll.type = 'button';
+                    clearAll.className = 'file-cards-clear';
+                    clearAll.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-x"/></svg> 清空全部 (' + pendingFiles.length + ')';
+                    clearAll.addEventListener('click', () => {
+                        pendingFiles = [];
+                        syncFileInput();
+                        renderFileCards();
+                    });
+                    fileCards.appendChild(clearAll);
+                }
                 fileCards.style.display = pendingFiles.length ? '' : 'none';
             }
 
             filePickerBtn.addEventListener('click', () => { if (!isMuted()) fileInput.click(); });
             fileInput.addEventListener('change', function() {
-                pendingFiles = Array.from(this.files || []);
-                syncFileInput();
-                renderFileCards();
+                appendPendingFiles(this.files);
+                this.value = '';   // 重置以便可再次选择同一批文件
             });
 
             // ---- 文件拖放：拖入文件填入待发送区（不自动发送） ----
@@ -1071,9 +1127,7 @@ function can(permission) {
                 e.preventDefault();
                 const files = e.dataTransfer.files;
                 if (!files || !files.length) return;
-                pendingFiles = Array.from(files);
-                syncFileInput();
-                renderFileCards();
+                appendPendingFiles(files);   // 追加而非覆盖
             });
             // 阻止在聊天区域外误拖放导致浏览器打开文件
             window.addEventListener('dragover', function(e) { if (isFileDrag(e)) e.preventDefault(); });
@@ -1213,6 +1267,35 @@ function can(permission) {
             }
 
             if (sendBtn) {
+                // ---- 逐文件上传进度 UI（卡片底部细进度条 + 状态描边） ----
+                const cardEls = () => Array.from(fileCards.querySelectorAll('.file-card'));
+
+                function startSendProgressUI() {
+                    cardEls().forEach(el => {
+                        el.classList.add('is-queued');
+                        const bar = document.createElement('div');
+                        bar.className = 'file-card-progress';
+                        bar.style.width = '0%';
+                        el.appendChild(bar);
+                    });
+                }
+
+                function setSendProgress(index, pct) {
+                    const el = cardEls()[index];
+                    if (!el) return;
+                    el.classList.add('is-active');
+                    const bar = el.querySelector('.file-card-progress');
+                    if (bar) bar.style.width = Math.round(pct * 100) + '%';
+                }
+
+                function finishSendCard(index, ok) {
+                    const el = cardEls()[index];
+                    if (!el) return;
+                    el.classList.remove('is-active');
+                    el.classList.toggle('is-done', !!ok);
+                    el.classList.toggle('is-failed', !ok);
+                }
+
                 sendBtn.addEventListener('click', function(e) {
                     e.preventDefault();
                     if (isSending || isMuted()) return;
@@ -1221,8 +1304,9 @@ function can(permission) {
                     if (!text.trim() && !files.length) return;
                     isSending = true;
                     stopPolling();
+                    startSendProgressUI();
                     const replyId = pendingReply ? pendingReply.id : '';
-                    const uploadOne = function(file, done) {
+                    const uploadOne = function(file, index, done) {
                         const fd = new FormData();
                         fd.append('file', file);
                         fd.append('username', currentUser);
@@ -1231,12 +1315,26 @@ function can(permission) {
                         $.ajax({
                             url: u('/chatts_file?update=') + encodeURIComponent(upd),
                             type: 'POST', data: fd, processData: false, contentType: false,
+                            xhr: function() {
+                                const xhr = $.ajaxSettings.xhr();
+                                if (xhr.upload) {
+                                    xhr.upload.addEventListener('progress', function(ev) {
+                                        if (ev.lengthComputable) setSendProgress(index, ev.loaded / ev.total);
+                                    });
+                                }
+                                return xhr;
+                            },
                             success: function(body) {
                                 upd = body.update || upd;
                                 if (body && body.message) echoSentMessage(body.message);
+                                finishSendCard(index, true);
                                 done(true);
                             },
-                            error: function(xhr) { handleAjaxError(xhr, '文件上传失败'); done(false); }
+                            error: function(xhr) {
+                                finishSendCard(index, false);
+                                handleAjaxError(xhr, '文件上传失败');
+                                done(false);
+                            }
                         });
                     };
                     const uploadAll = function(done) {
@@ -1246,15 +1344,15 @@ function can(permission) {
                             if (!ok) { done(false); return; }
                             index++;
                             if (index >= files.length) { done(true); return; }
-                            uploadOne(files[index], next);
+                            uploadOne(files[index], index, next);
                         };
-                        uploadOne(files[0], next);
+                        uploadOne(files[0], 0, next);
                     };
                     uploadAll(function(fileOk) {
                         fileInput.value = '';
                         pendingFiles = [];
                         syncFileInput();
-                        renderFileCards();
+                        setTimeout(() => { renderFileCards(); }, fileOk ? 600 : 2500);   // 成功短暂展示✓，失败保留状态更久
                         if (!fileOk) { isSending = false; startPolling(); return; }
                         if (!text.trim()) {
                             clearReply();
@@ -1453,10 +1551,17 @@ function can(permission) {
                 termSyncShowBtn();
             }
             const sessionAlert = document.getElementById('sessionAlert');
+            const sessionGlitch = document.getElementById('sessionGlitch');
             document.getElementById('alertConfirmBtn').addEventListener('click', () => window.location.replace(BASE_PATH + '/'));
 
             function showSessionAlert() {
                 if (!sessionAlert.classList.contains('active')) {
+                    // 全屏故障动画：噪声与撕裂条覆盖包括弹窗在内的整个屏幕
+                    if (sessionGlitch) {
+                        sessionGlitch.classList.remove('active');
+                        void sessionGlitch.offsetWidth;
+                        sessionGlitch.classList.add('active');
+                    }
                     sessionAlert.classList.add('active');
                     stopPolling();
                     sessionValid = false;
@@ -2602,7 +2707,10 @@ function can(permission) {
                 }
                 const w = createDraggableWindow('<svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> 管理面板', '<div class="admin-loading">加载中...</div>', false, 'admin');
                 w.style.width = '900px';
+                w.style.height = 'min(600px, 72vh)';   // 固定窗口高度，管理面板撑满
                 const c = w.querySelector('.window-content');
+                c.style.flex = '1';
+                c.style.maxHeight = 'none';
                 fetch(u('/admin/content?update=') + encodeURIComponent(upd))
                     .then(r => {
                         if (!r.ok) throw new Error('HTTP ' + r.status);
