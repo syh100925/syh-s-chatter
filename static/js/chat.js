@@ -305,9 +305,15 @@ function can(permission) {
             function createDraggableWindow(title, html, showProgress, key) {
                 const win = document.createElement('div');
                 win.className = 'draggable-window';
-                win.style.left = Math.max(30, (window.innerWidth - 550) / 2 + Math.random() * 80) + 'px';
-                win.style.top = Math.max(30, (window.innerHeight - 400) / 2 + Math.random() * 60) + 'px';
-                win.style.width = '600px';
+                // 手机端：窗口全屏页面化（.window-mobile，跳过随机定位与拖拽）
+                const isMobile = window.matchMedia('(max-width: 768px)').matches;
+                if (isMobile) {
+                    win.classList.add('window-mobile');
+                } else {
+                    win.style.left = Math.max(30, (window.innerWidth - 550) / 2 + Math.random() * 80) + 'px';
+                    win.style.top = Math.max(30, (window.innerHeight - 400) / 2 + Math.random() * 60) + 'px';
+                    win.style.width = '600px';
+                }
                 win.style.opacity = '0';
                 win.innerHTML =
                     `<div class="window-titlebar"><span class="window-title">${title}</span><div class="window-actions"><button class="window-btn copy-content-btn" style="display:none;">复制</button><button class="window-btn link-window-btn" style="display:none;">复制链接</button><button class="window-btn download-window-btn" style="display:none;">下载</button><button class="window-btn close-window-btn"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></div></div>${showProgress?'<div class="window-progress"><div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div><div class="progress-text">准备下载...</div></div>':''}<div class="window-content">${html}</div>`;
@@ -317,24 +323,26 @@ function can(permission) {
                 const contentArea = win.querySelector('.window-content');
                 let dragging = false,
                     sx, sy, ix, iy;
-                titlebar.addEventListener('mousedown', (e) => {
-                    if (e.target.classList.contains('window-btn')) return;
-                    dragging = true;
-                    const r = win.getBoundingClientRect();
-                    sx = e.clientX;
-                    sy = e.clientY;
-                    ix = r.left;
-                    iy = r.top;
-                    bringWindowToFront(win);
-                    e.preventDefault();
-                });
-                document.addEventListener('mousemove', (e) => {
-                    if (!dragging) return;
-                    win.style.left = Math.max(0, Math.min(window.innerWidth - win.offsetWidth, ix + e.clientX - sx)) +
-                        'px';
-                    win.style.top = Math.max(0, Math.min(window.innerHeight - 50, iy + e.clientY - sy)) + 'px';
-                });
-                document.addEventListener('mouseup', () => { dragging = false; });
+                if (!isMobile) {
+                    titlebar.addEventListener('mousedown', (e) => {
+                        if (e.target.classList.contains('window-btn')) return;
+                        dragging = true;
+                        const r = win.getBoundingClientRect();
+                        sx = e.clientX;
+                        sy = e.clientY;
+                        ix = r.left;
+                        iy = r.top;
+                        bringWindowToFront(win);
+                        e.preventDefault();
+                    });
+                    document.addEventListener('mousemove', (e) => {
+                        if (!dragging) return;
+                        win.style.left = Math.max(0, Math.min(window.innerWidth - win.offsetWidth, ix + e.clientX - sx)) +
+                            'px';
+                        win.style.top = Math.max(0, Math.min(window.innerHeight - 50, iy + e.clientY - sy)) + 'px';
+                    });
+                    document.addEventListener('mouseup', () => { dragging = false; });
+                }
                 contentArea.addEventListener('click', () => bringWindowToFront(win));
                 win.querySelector('.close-window-btn').addEventListener('click', () => closeDraggableWindow(win, key));
                 bringWindowToFront(win);
@@ -2717,7 +2725,7 @@ function can(permission) {
                         return r.text();
                     })
                     .then(html => {
-                        c.innerHTML = html;
+                        c.innerHTML = html.trim();   // 去除模板首尾换行，避免 pre-wrap 下产生幻影空行
                         if (window.ChatterAdmin) {
                             window.ChatterAdmin.init();
                             return;

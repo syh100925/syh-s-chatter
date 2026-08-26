@@ -1408,19 +1408,26 @@
             color: var(--fg-primary);
             position: relative;
             cursor: default;
+            /* 滚动条与管理面板统一（8px、padding-box 留隙、hover 提亮） */
+            scrollbar-width: thin;
+            scrollbar-color: var(--scrollbar-thumb, #555) var(--scrollbar-track, transparent);
         }
         .window-content::-webkit-scrollbar {
-            width: 6px;
+            width: 8px;
+            height: 8px;
         }
         .window-content::-webkit-scrollbar-track {
             background: var(--scrollbar-track);
         }
         .window-content::-webkit-scrollbar-thumb {
             background: var(--scrollbar-thumb);
-            border-radius: 3px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
         }
         .window-content::-webkit-scrollbar-thumb:hover {
             background: var(--scrollbar-thumb-hover);
+            border: 2px solid transparent;
+            background-clip: padding-box;
         }
         .window-content pre {
             margin: 0;
@@ -1508,52 +1515,62 @@
         .settings-menu-container {
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 26px;
             flex-wrap: wrap;
             padding: 20px 0;
         }
+        /* 倾斜矩形按钮：与管理面板菜单同款（rotate 保持直角 + 独立色描边 + 自右向左填充） */
         .settings-menu-btn {
+            --tilt: 3deg;
+            appearance: none;
+            -webkit-appearance: none;
             position: relative;
             width: 120px;
             height: 200px;
             background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--fg-primary);
+            border: 1px solid color-mix(in srgb, var(--stripe-color, var(--border-color)) 40%, transparent);
+            color: var(--fg-muted);
             font-family: var(--font-mono);
             font-size: 0.9rem;
             cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 2px;
-            transform: skewX(-8deg);
-            transition: background 0.3s, color 0.3s, border-color 0.3s;
+            transform: rotate(var(--tilt));
+            transition: color 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.25s;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            animation: adminStaggerIn 0.35s ease-out both;
         }
+        .settings-menu-btn:nth-child(1) { animation-delay: 0s; }
+        .settings-menu-btn:nth-child(2) { animation-delay: 0.06s; }
+        .settings-menu-btn:nth-child(3) { animation-delay: 0.12s; }
         .settings-menu-btn span {
-            transform: skewX(8deg);
+            transform: rotate(calc(var(--tilt) * -1));
             position: relative;
             z-index: 1;
         }
-        .settings-menu-btn:hover {
-            color: var(--bg-primary);
-            border-color: var(--stripe-color, var(--fg-primary));
-        }
-        .settings-menu-btn::after {
+        /* 填充层：锚定右缘，宽度 0 -> 100% 即自右向左填充 */
+        .settings-menu-btn::before {
             content: '';
             position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(135deg, transparent 40%, var(--stripe-color, var(--fg-primary)) 45%, var(--stripe-color, var(--fg-primary)) 55%, transparent 60%);
-            opacity: 0;
-            transition: opacity 0.3s;
-            transform: skewX(8deg);
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 100%;
+            background: var(--stripe-color, var(--fg-primary));
+            transition: width 0.25s ease;
         }
-        .settings-menu-btn:hover::after {
-            opacity: 1;
+        .settings-menu-btn:hover {
+            transform: rotate(calc(var(--tilt) / 2));
+            color: #10131a;
+            border-color: var(--stripe-color, var(--fg-primary));
+            box-shadow: 0 0 14px color-mix(in srgb, var(--stripe-color, var(--fg-primary)) 85%, transparent),
+                0 0 30px color-mix(in srgb, var(--stripe-color, var(--fg-primary)) 40%, transparent);
+        }
+        .settings-menu-btn:hover::before {
+            width: 100%;
         }
         .settings-row {
             display: flex;
@@ -2258,6 +2275,9 @@
     font-size: 13px;
     color: var(--fg-primary);
     font-family: var(--font-mono);
+    /* 片段注入 .window-content（white-space: pre-wrap 用于文件预览），
+       必须恢复 normal，否则模板缩进换行会渲染成大量幻影空行 */
+    white-space: normal;
 }
 
 /* 布局：二级跳转 —— 一级横向菜单页 / 二级分区页，共用一个舞台 */
@@ -3631,6 +3651,7 @@
     .admin-tab-page.active > *,
     .admin-page.active > *,
     .admin-menu-btn,
+    .settings-menu-btn,
     .admin-toast,
     .admin-code,
     .admin-group-card,
@@ -3647,6 +3668,8 @@
     .admin-bar,
     .admin-menu-btn,
     .admin-menu-btn::before,
+    .settings-menu-btn,
+    .settings-menu-btn::before,
     .upload-progress-fill,
     .upload-overall-fill {
         transition: none !important;
@@ -3755,37 +3778,121 @@
     animation: fadeInUp 0.45s ease-out both;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .theme-transition,
-    #chat,
-    .chat-header,
-    .chat-divider,
-    .system-message,
-    .user-info,
-    #chat-combined,
-    .boot-line,
-    .theme-toggle,
-    .appearance-btn,
-    .tools-btn,
-    .admin-entry-btn,
-    #sd,
-    .admin-standalone {
-        animation: none !important;
-        transition: none !important;
-    }
+        @media (prefers-reduced-motion: reduce) {
+            .theme-transition,
+            #chat,
+            .chat-header,
+            .chat-divider,
+            .system-message,
+            .user-info,
+            #chat-combined,
+            .boot-line,
+            .theme-toggle,
+            .appearance-btn,
+            .tools-btn,
+            .admin-entry-btn,
+            #sd,
+            .admin-standalone {
+                animation: none !important;
+                transition: none !important;
+            }
 
-    /* 故障动画在减弱动态偏好下退化为静态遮罩 */
-    .glitch-overlay.active {
-        display: flex;
-    }
-    .glitch-overlay .glitch-noise,
-    .glitch-overlay .glitch-tears {
-        animation: none !important;
-        transform: none !important;
-        clip-path: none !important;
-        opacity: 1 !important;
-    }
-}
+            /* 故障动画在减弱动态偏好下退化为静态遮罩 */
+            .glitch-overlay.active {
+                display: flex;
+            }
+            .glitch-overlay .glitch-noise,
+            .glitch-overlay .glitch-tears {
+                animation: none !important;
+                transform: none !important;
+                clip-path: none !important;
+                opacity: 1 !important;
+            }
+        }
+
+        /* ===== 手机端适配：所有可拖拽窗口全屏页面化 ===== */
+        @media (max-width: 768px) {
+            /* 页面悬浮按钮压到窗口层级之下，避免穿透全屏窗口遮挡关闭按钮 */
+            .theme-toggle,
+            .appearance-btn,
+            .tools-btn,
+            .admin-entry-btn,
+            .cmd-sidebar,
+            .cmd-terminal,
+            .term-show-btn {
+                z-index: 500 !important;
+            }
+
+            .draggable-window.window-mobile {
+                left: 0 !important;
+                top: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+                max-width: none !important;
+                min-width: 0 !important;
+                border-left: none;
+                border-right: none;
+                border-bottom: none;
+            }
+            .draggable-window.window-mobile .window-titlebar {
+                cursor: default;
+                padding: 10px 12px;
+            }
+            .draggable-window.window-mobile .window-title {
+                max-width: 55%;
+                font-size: 0.95rem;
+            }
+            /* 关闭等按钮加大触控目标 */
+            .draggable-window.window-mobile .window-btn {
+                padding: 8px 14px;
+                font-size: 15px;
+            }
+            .draggable-window.window-mobile .window-content {
+                flex: 1;
+                max-height: none;
+                padding: 12px;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* 管理面板触屏细节 */
+            .admin-menu-btn {
+                width: 88px;
+            }
+            .admin-menu-btn .icon {
+                width: 20px;
+                height: 20px;
+            }
+            .admin-menu-scroll {
+                gap: 16px;
+                padding: 10px;
+            }
+            .admin-stage {
+                box-shadow: none;
+            }
+            .admin-table th,
+            .admin-table td {
+                padding: 7px 8px;
+            }
+
+            /* 独立管理页：回归自然页面流 */
+            .admin-standalone {
+                padding: 8px;
+            }
+            .admin-standalone-header {
+                flex-wrap: wrap;
+            }
+            .admin-standalone-body {
+                height: auto;
+                min-height: 0;
+                padding: 8px;
+                overflow: visible;
+            }
+            .admin-standalone-body .admin-panel-root {
+                height: auto;
+                min-height: calc(100dvh - 230px);
+            }
+        }
 
 /* ============ 内联 SVG 图标 ============ */
 .icon {

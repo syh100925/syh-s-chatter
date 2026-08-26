@@ -27,4 +27,5 @@ def admin_content():
     """聊天室管理弹窗的页面片段（需带 token 访问）。"""
     if not auth.authenticate_request():
         return auth.json_error('认证失败', 401)
-    return render_template('admin_content.html', update=request.args.get('update') or '')
+    # strip：去除 Jinja 渲染产生的首尾换行，避免片段注入 pre-wrap 容器时出现幻影空行
+    return render_template('admin_content.html', update=request.args.get('update') or '').strip()
