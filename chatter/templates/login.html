@@ -21,6 +21,8 @@
             --error-glow-1: #ff6b6b;
             --error-glow-2: #ff4444;
             --ok-color: #4caf50;
+            /* 格子标号色：与格子前景色/状态色反色，深底用浅字、浅底用深字 */
+            --auth-label-color: rgba(255, 255, 255, 0.72);
             --font-mono: 'Jetbrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
             --transition-speed: 0.2s;
             --glow-text-1: #ffffff;
@@ -41,6 +43,7 @@
             --error-glow-1: #d32f2f;
             --error-glow-2: #b71c1c;
             --ok-color: #2e7d32;
+            --auth-label-color: rgba(0, 0, 0, 0.58);
             --glow-text-1: #1a1a1a;
             --glow-text-2: #666666;
         }
@@ -472,8 +475,12 @@
            所有过渡统一使用 ease。
            ================================================================ */
         .auth-stage {
-            --auth-frame-w: min(440px, 82vw);
-            --auth-frame-h: 232px;
+            --auth-frame-w: min(760px, 88vw);
+            --auth-frame-h: min(460px, 52vh);
+            /* 格子间隙与状态条尺寸独立于窗口，二者各自用变量控制 */
+            --auth-tile-gap: 4px;
+            --auth-bar-w: 1px;
+            --auth-bar-h: 96px;
             position: fixed;
             inset: 0;
             z-index: 10001;
@@ -516,16 +523,18 @@
             border-color: var(--error-color);
         }
 
-        /* 格子层：铺满长方形，随阶段切换显隐 */
+        /* 格子层：铺满长方形，随阶段切换显隐；格子之间留出间隙 */
         .auth-tiles {
             position: absolute;
             inset: 0;
             display: grid;
+            gap: var(--auth-tile-gap);
         }
         .auth-tile {
             position: relative;
             overflow: hidden;
-            background: var(--bg-secondary);
+            /* 初始前景色：格子一上来就是有存在感的颜色，而不是背景色 */
+            background: var(--fg-secondary);
             opacity: 0;
             transform: scale(0.4);
             transition: opacity 0.28s ease, transform 0.28s ease,
@@ -541,27 +550,22 @@
             opacity: 0;
             transform: scale(0.3);
         }
-        /* 行列标号 */
+        /* 行列标号：与格子底色反色，保证初始前景色与绿/红状态下都清晰 */
         .auth-tile-label {
             position: absolute;
             inset: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 6px;
+            font-size: 8px;
             line-height: 1;
             letter-spacing: 0;
-            color: var(--fg-muted);
-            opacity: 0.55;
+            color: var(--auth-label-color);
             white-space: nowrap;
-        }
-        .auth-stage.is-filling .auth-tile-label,
-        .auth-stage.is-clearing .auth-tile-label {
-            opacity: 0.9;
+            transition: opacity 0.18s ease;
         }
         .auth-stage.is-clearing .auth-tile-label {
             opacity: 0;
-            transition: opacity 0.18s ease;
         }
         /* 结果态：格子切换绿色 / 红色 */
         .auth-stage.is-ok .auth-tile {
@@ -579,9 +583,9 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 2px;
-            height: var(--auth-frame-h);
-            margin-top: calc(var(--auth-frame-h) / -2);
+            width: var(--auth-bar-w);
+            height: var(--auth-bar-h);
+            margin-top: calc(var(--auth-bar-h) / -2);
             opacity: 0;
             background: var(--fg-muted);
             transition: transform 0.5s ease, opacity 0.3s ease,
@@ -892,7 +896,8 @@
 
             // ---- 动画时序（毫秒）----
             var T = {
-                cell: 26,        // 格子边长
+                cell: 34,        // 格子边长（不含间隙）
+                gap: 4,          // 格子间隙，与 --auth-tile-gap 保持一致
                 tileIn: 280,     // 单格淡入
                 tileOut: 240,    // 单格消失
                 stepIn: 6,       // 每层对角线的错峰
@@ -902,7 +907,7 @@
                 color: 300,      // 结果换色
                 split: 500,      // 状态条拉开
                 morph: 450,      // 终态过渡
-                minRun: 750      // 结果回来前的最短动画时长，避免一闪而过
+                minRun: 1000     // 结果回来后至少停留这么久再变色，避免一闪而过
             };
 
             var STATUS_TEXT = {
@@ -937,8 +942,8 @@
                     frameH = 232;
                 }
 
-                var cols = Math.max(1, Math.round(frameW / T.cell));
-                var rows = Math.max(1, Math.round(frameH / T.cell));
+                var cols = Math.max(1, Math.round((frameW + T.gap) / (T.cell + T.gap)));
+                var rows = Math.max(1, Math.round((frameH + T.gap) / (T.cell + T.gap)));
                 tileDiagSpan = Math.max(rows - 1, cols - 1) + 1;
                 var html = '';
 
@@ -956,6 +961,7 @@
                 }
                 tilesBox.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
                 tilesBox.style.gridTemplateRows = 'repeat(' + rows + ', 1fr)';
+                tilesBox.style.gap = T.gap + 'px';
                 tilesBox.innerHTML = html;
                 tilesBuilt = true;
             }
@@ -1084,17 +1090,20 @@
                 });
             }
 
-            // 五阶段：装载 → 结果 → 消格 → 状态条拉开 → 终态
-            function playAttempt(result) {
-                var ok = result.kind === 'ok';
-                var started = Date.now();
-
+            // 阶段 A（装载）：点击即刻开始铺格子，不等服务器返回
+            function beginFill() {
                 stage.classList.add('active');
                 hideFormArea();
                 void stage.offsetWidth;   // 强制回流，让缩放过渡从 0 起播
                 buildTiles();
                 stage.classList.add('is-filling');
                 liveRegion.textContent = '正在验证';
+            }
+
+            // 阶段 B~E：结果 → 消格 → 状态条拉开 → 终态
+            // started 为点击时刻；即使结果早已回来也至少展示 minRun 再变色。
+            function playAttempt(result, started) {
+                var ok = result.kind === 'ok';
 
                 function doneA() {
                     // 结果：格子与轮廓切绿/红
@@ -1163,6 +1172,10 @@
 
                 clearError();
                 setSubmitting(true);
+                var started = Date.now();
+
+                // 动画与请求并行：点击即刻铺格子，服务器慢时界面也有反馈
+                if (!reducedMotion) beginFill();
 
                 var loginPromise = fetch(BASE_PATH + '/login', {
                     method: 'POST',
@@ -1204,7 +1217,9 @@
                     return;
                 }
 
-                loginPromise.then(playAttempt);
+                loginPromise.then(function (result) {
+                    return playAttempt(result, started);
+                });
             });
 
             // 重新输入时收起故障覆盖层
