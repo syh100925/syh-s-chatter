@@ -20,6 +20,7 @@
             --error-color: #ff6b6b;
             --error-glow-1: #ff6b6b;
             --error-glow-2: #ff4444;
+            --ok-color: #4caf50;
             --font-mono: 'Jetbrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
             --transition-speed: 0.2s;
             --glow-text-1: #ffffff;
@@ -39,6 +40,7 @@
             --error-color: #d32f2f;
             --error-glow-1: #d32f2f;
             --error-glow-2: #b71c1c;
+            --ok-color: #2e7d32;
             --glow-text-1: #1a1a1a;
             --glow-text-2: #666666;
         }
@@ -463,6 +465,223 @@
             }
         }
 
+        /* ================================================================
+           登录尝试动画舞台
+           阶段：装载(格子自右上角对角扩散) → 结果(绿/红) → 消格(右上角优先)
+                → 状态条自中点向两边拉开 → 中间面板过渡为新窗口
+           所有过渡统一使用 ease。
+           ================================================================ */
+        .auth-stage {
+            --auth-frame-w: min(440px, 82vw);
+            --auth-frame-h: 232px;
+            position: fixed;
+            inset: 0;
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.24s ease, visibility 0.24s ease;
+        }
+        .auth-stage.active {
+            visibility: visible;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* 长方型窗口：自中心 ease 缩放展开 */
+        .auth-frame {
+            position: relative;
+            width: var(--auth-frame-w);
+            height: var(--auth-frame-h);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            transform: scale(0.18);
+            opacity: 0;
+            transition: transform 0.45s ease, opacity 0.45s ease,
+                border-color 0.3s ease, width 0.45s ease, height 0.45s ease;
+        }
+        .auth-stage.active .auth-frame {
+            transform: scale(1);
+            opacity: 1;
+        }
+        /* 结果态：轮廓染成状态色 */
+        .auth-stage.is-ok .auth-frame {
+            border-color: var(--ok-color);
+        }
+        .auth-stage.is-fail .auth-frame {
+            border-color: var(--error-color);
+        }
+
+        /* 格子层：铺满长方形，随阶段切换显隐 */
+        .auth-tiles {
+            position: absolute;
+            inset: 0;
+            display: grid;
+        }
+        .auth-tile {
+            position: relative;
+            overflow: hidden;
+            background: var(--bg-secondary);
+            opacity: 0;
+            transform: scale(0.4);
+            transition: opacity 0.28s ease, transform 0.28s ease,
+                background-color 0.3s ease;
+        }
+        /* 装载：格子自右上角对角线扩散铺满 */
+        .auth-stage.is-filling .auth-tile {
+            opacity: 1;
+            transform: scale(1);
+        }
+        /* 消格：同一对角序，右上角先消失 */
+        .auth-stage.is-clearing .auth-tile {
+            opacity: 0;
+            transform: scale(0.3);
+        }
+        /* 行列标号 */
+        .auth-tile-label {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 6px;
+            line-height: 1;
+            letter-spacing: 0;
+            color: var(--fg-muted);
+            opacity: 0.55;
+            white-space: nowrap;
+        }
+        .auth-stage.is-filling .auth-tile-label,
+        .auth-stage.is-clearing .auth-tile-label {
+            opacity: 0.9;
+        }
+        .auth-stage.is-clearing .auth-tile-label {
+            opacity: 0;
+            transition: opacity 0.18s ease;
+        }
+        /* 结果态：格子切换绿色 / 红色 */
+        .auth-stage.is-ok .auth-tile {
+            background: var(--ok-color);
+        }
+        .auth-stage.is-fail .auth-tile {
+            background: var(--error-color);
+        }
+
+        /* 状态条：自屏幕中点向左右两边拉开；两条竖直细长长方形。
+           挂在 .auth-stage（全屏）下，故 left:50% 即视口中点；
+           高度与长方形窗口一致（不铺满屏幕），用 margin 负值做垂直居中，
+           以免 translate 被水平位移占掉 */
+        .auth-bar {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: var(--auth-frame-h);
+            margin-top: calc(var(--auth-frame-h) / -2);
+            opacity: 0;
+            background: var(--fg-muted);
+            transition: transform 0.5s ease, opacity 0.3s ease,
+                background-color 0.3s ease;
+        }
+        .auth-stage.is-ok .auth-bar {
+            background: var(--ok-color);
+        }
+        .auth-stage.is-fail .auth-bar {
+            background: var(--error-color);
+        }
+        /* 未拉开时两条贴合在舞台中点 */
+        .auth-bar-l {
+            transform: translateX(-100%);
+        }
+        .auth-bar-r {
+            transform: translateX(0);
+        }
+        .auth-stage.is-split .auth-bar {
+            opacity: 1;
+        }
+        .auth-stage.is-split .auth-bar-l {
+            transform: translateX(-50vw);
+        }
+        .auth-stage.is-split .auth-bar-r {
+            transform: translateX(50vw);
+        }
+        /* 成功终态：两条竖条继续 ease 移出舞台 */
+        .auth-stage.is-leaving .auth-bar-l {
+            transform: translateX(-110vw);
+        }
+        .auth-stage.is-leaving .auth-bar-r {
+            transform: translateX(110vw);
+        }
+
+        /* 中间背景色长方形：承载状态色提示信息。
+           尺寸与 .auth-frame 一致，以便长方形那圈状态色轮廓在状态条阶段仍然可见 */
+        .auth-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: var(--auth-frame-w);
+            height: var(--auth-frame-h);
+            overflow: hidden;
+            background: var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .auth-stage.is-split .auth-center {
+            opacity: 1;
+        }
+        /* 成功终态：面板淡出，交给注入脚本继续 morph */
+        .auth-stage.is-leaving .auth-center {
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+        .auth-center-text {
+            white-space: nowrap;
+            font-size: 0.8rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            opacity: 0;
+            transition: opacity 0.3s ease 0.15s;
+        }
+        .auth-stage.is-split .auth-center-text {
+            opacity: 1;
+        }
+        .auth-stage.is-ok .auth-center-text {
+            color: var(--ok-color);
+        }
+        .auth-stage.is-fail .auth-center-text {
+            color: var(--error-color);
+        }
+
+        /* 供读屏软件播报状态 */
+        .auth-live {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            clip-path: inset(50%);
+            white-space: nowrap;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .auth-stage,
+            .auth-frame,
+            .auth-tile,
+            .auth-bar,
+            .auth-center,
+            .auth-center-text {
+                transition: none;
+            }
+        }
+
         /* ========== 底部信息 ========== */
         .footer-note {
             margin-top: 2.5rem;
@@ -623,6 +842,21 @@
         </div>
     </div>
 
+    <!-- 登录尝试动画舞台：装饰性内容，供读屏的文本见 .auth-live -->
+    <div class="auth-stage" id="authStage" aria-hidden="true">
+        <div class="auth-frame" id="authFrame">
+            <div class="auth-tiles" id="authTiles"></div>
+        </div>
+        <!-- 状态条与中间面板挂在舞台而非长方形上：长方形 overflow:hidden 会裁掉它们，
+             导致「向两边拉开」看不见 -->
+        <div class="auth-bar auth-bar-l" id="authBarL"></div>
+        <div class="auth-bar auth-bar-r" id="authBarR"></div>
+        <div class="auth-center" id="authCenter">
+            <span class="auth-center-text" id="authCenterText"></span>
+        </div>
+    </div>
+    <p class="auth-live" id="authLive" role="status" aria-live="polite"></p>
+
     <!-- 页面配置（挂载前缀等），见 _base_path 注入约定 -->
     <script>
         window.LOGIN_CONFIG = {
@@ -647,11 +881,84 @@
             var brandWords = document.getElementById('brandWords');
             var DEFAULT_SUBMIT_TEXT = submitBtn.textContent;
 
+            var stage = document.getElementById('authStage');
+            var tilesBox = document.getElementById('authTiles');
+            var centerText = document.getElementById('authCenterText');
+            var liveRegion = document.getElementById('authLive');
+
             // 正常品牌词与故障品牌词（失败时整体切换，与 login_error.html 视觉一致）
             var NORMAL_WORDS = ['SECURE', 'ENCRYPT'];
             var ERROR_WORDS = ['DENIED', 'BLOCKED'];
 
+            // ---- 动画时序（毫秒）----
+            var T = {
+                cell: 26,        // 格子边长
+                tileIn: 280,     // 单格淡入
+                tileOut: 240,    // 单格消失
+                stepIn: 6,       // 每层对角线的错峰
+                stepOut: 5,
+                frame: 450,      // 长方形缩放展开
+                fade: 240,       // 舞台淡入
+                color: 300,      // 结果换色
+                split: 500,      // 状态条拉开
+                morph: 450,      // 终态过渡
+                minRun: 750      // 结果回来前的最短动画时长，避免一闪而过
+            };
+
+            var STATUS_TEXT = {
+                ok: 'ACCESS GRANTED',
+                fail: 'ACCESS DENIED',
+                net: 'CONNECTION LOST'
+            };
+
+            var reducedMotion = !!(window.matchMedia
+                && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
             var submitting = false;
+            var tilesBuilt = false;
+            var tileDiagSpan = 1;   // 对角层数，用于精确推算消格总时长
+
+            function wait(ms) {
+                return new Promise(function (resolve) { setTimeout(resolve, ms); });
+            }
+
+            // 依长方形实际布局尺寸建自适应网格；delay 按「距右上角的切比雪夫距离」
+            // 递增，形成自右上角扩散的对角带。
+            // 注意：必须用 offsetWidth/Height（布局尺寸）而非 getBoundingClientRect，
+            // 后者含 scale 变换值，长方形尚在缩放中时会算出一张过小的网格。
+            function buildTiles() {
+                if (tilesBuilt) return;
+                var frame = document.getElementById('authFrame');
+                var frameW = frame.offsetWidth;
+                var frameH = frame.offsetHeight;
+                if (!frameW || !frameH) {
+                    // 极端情况（舞台未参与布局）退回视口估算
+                    frameW = Math.min(440, window.innerWidth * 0.82);
+                    frameH = 232;
+                }
+
+                var cols = Math.max(1, Math.round(frameW / T.cell));
+                var rows = Math.max(1, Math.round(frameH / T.cell));
+                tileDiagSpan = Math.max(rows - 1, cols - 1) + 1;
+                var html = '';
+
+                for (var r = 0; r < rows; r++) {
+                    for (var c = 0; c < cols; c++) {
+                        // 到右上角的切比雪夫距离：diag=0 即右上角那一格
+                        var diag = Math.max(r, cols - 1 - c);
+                        var dIn = diag * T.stepIn;
+                        var dOut = diag * T.stepOut;
+                        html += '<div class="auth-tile" style="transition-delay:'
+                            + dIn + 'ms,' + dIn + 'ms,' + dOut + 'ms">'
+                            + '<span class="auth-tile-label">R' + (r + 1) + '·C' + (c + 1) + '</span>'
+                            + '</div>';
+                    }
+                }
+                tilesBox.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+                tilesBox.style.gridTemplateRows = 'repeat(' + rows + ', 1fr)';
+                tilesBox.innerHTML = html;
+                tilesBuilt = true;
+            }
 
             function setBrandWords(words, isError) {
                 var spans = brandWords.querySelectorAll('span');
@@ -680,12 +987,76 @@
                 submitBtn.textContent = flag ? '// 验证中 //' : DEFAULT_SUBMIT_TEXT;
             }
 
-            // 无刷新换档：fetch 目标页 HTML → 淡出到背景色遮住重解析白闪 →
-            // 整档替换并同步地址栏。
+            // 淡出登录区内容（长方形出现的同时）
+            function hideFormArea() {
+                var area = document.querySelector('.login-form-area');
+                var brand = document.querySelector('.brand');
+                var title = document.querySelector('.login-title');
+                [area, brand, title].forEach(function (el) {
+                    if (!el) return;
+                    el.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                    el.style.opacity = '0';
+                    el.style.transform = 'scale(0.97)';
+                });
+            }
+
+            function restoreFormArea() {
+                var area = document.querySelector('.login-form-area');
+                var brand = document.querySelector('.brand');
+                var title = document.querySelector('.login-title');
+                [area, brand, title].forEach(function (el) {
+                    if (!el) return;
+                    el.style.opacity = '';
+                    el.style.transform = '';
+                });
+            }
+
+            // 换档时注入：把长方形终态精确落到真实 #chat 的矩形上。
+            // document.open() 会销毁本页 JS 上下文，此处只能把代码以字符串形式
+            // 注入目标页 —— 时长与配色在此内联为字面量。
+            function buildMorphInject(token) {
+                return '<style id="auth-morph-style">'
+                    + '#auth-morph-stage{position:fixed;inset:0;z-index:10001;'
+                    + 'pointer-events:none;overflow:hidden}'
+                    + '#auth-morph-center{position:absolute;background:var(--bg-primary);'
+                    + 'transform-origin:center center;transition:none}'
+                    + '@media (prefers-reduced-motion: reduce){ #auth-morph-center{transition:none}}'
+                    + '</style>'
+                    + '<div id="auth-morph-stage" aria-hidden="true">'
+                    + '<div id="auth-morph-center"></div></div>'
+                    + '<script>(function(){var d=document.getElementById("auth-morph-center");'
+                    + 'var s=document.getElementById("auth-morph-stage");'
+                    + 'function place(sel,anim){var t=document.querySelector(sel);'
+                    + 'if(!t){return false;}var r=t.getBoundingClientRect();'
+                    + 'if(!r.width||!r.height){return false;}'
+                    // 记录落位依据的矩形，便于验证「精确落到 #chat 的矩形」
+                    + 'window.__AUTH_MORPH_FROM={l:Math.round(r.left),t:Math.round(r.top),'
+                    + 'w:Math.round(r.width),h:Math.round(r.height),sel:sel};'
+                    + 'd.style.transition="none";'
+                    + 'd.style.left=r.left+"px";d.style.top=r.top+"px";'
+                    + 'd.style.width=r.width+"px";d.style.height=r.height+"px";'
+                    + 'void d.offsetWidth;'
+                    + 'd.style.transition=anim;return true;}'
+                    + 'function run(){'
+                    // #chat 自带 fadeInUp 入场（含 translateY），测量前先摘掉，
+                    // 否则量到的是动画中间态的矩形（与 chat.js 主题切换同一做法）
+                    + 'var c=document.getElementById("chat");'
+                    + 'if(c){c.style.animation="none";}'
+                    + 'void document.body.offsetWidth;'
+                    + 'var ok=place("#chat","all ' + T.morph + 'ms ease");'
+                    + 'if(!ok){ok=place("#body","all ' + T.morph + 'ms ease");}'
+                    + 'if(ok){setTimeout(function(){s.remove();},'+ T.morph + '+60);}'
+                    + 'else{s.remove();}}'
+                    + 'if(document.readyState==="loading"){'
+                    + 'document.addEventListener("DOMContentLoaded",run);}else{run();}'
+                    + '})();<\/script>';
+            }
+
+            // 无刷新换档：fetch 目标页 HTML → 整档替换并同步地址栏。
             // document.open() 会重置文档并重建全局作用域，因此 chat.js 顶层的
             // const BASE_PATH 可正常重新声明；document.close() 结束解析后同样会
             // 重新触发 DOMContentLoaded，chat.js 的初始化照常执行。
-            function softNavigate(url) {
+            function softNavigate(url, withMorph) {
                 return fetch(url, { credentials: 'same-origin' }).then(function (response) {
                     // 被重定向（会话失效等）或返回非 200 时放弃换档，走整页跳转兜底
                     if (response.redirected || !response.ok) {
@@ -695,16 +1066,11 @@
                     return response.text();
                 }).then(function (html) {
                     if (html === null) return;
+                    if (withMorph) {
+                        html = html.replace('</body>', buildMorphInject(url) + '</body>');
+                    }
 
-                    var fade = document.createElement('div');
-                    fade.className = 'nav-fade';
-                    document.body.appendChild(fade);
-                    // 强制回流以确保过渡生效
-                    void fade.offsetWidth;
-                    fade.classList.add('active');
-
-                    var reduced = window.matchMedia
-                        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    var reduced = reducedMotion;
                     var delay = reduced ? 0 : 180;
 
                     setTimeout(function () {
@@ -716,6 +1082,72 @@
                         document.close();
                     }, delay);
                 });
+            }
+
+            // 五阶段：装载 → 结果 → 消格 → 状态条拉开 → 终态
+            function playAttempt(result) {
+                var ok = result.kind === 'ok';
+                var started = Date.now();
+
+                stage.classList.add('active');
+                hideFormArea();
+                void stage.offsetWidth;   // 强制回流，让缩放过渡从 0 起播
+                buildTiles();
+                stage.classList.add('is-filling');
+                liveRegion.textContent = '正在验证';
+
+                function doneA() {
+                    // 结果：格子与轮廓切绿/红
+                    stage.classList.add(ok ? 'is-ok' : 'is-fail');
+                    centerText.textContent = STATUS_TEXT[result.kind] || STATUS_TEXT.fail;
+                    liveRegion.textContent = ok ? '验证通过' : '验证失败';
+                    return wait(T.color);
+                }
+
+                function stageC() {
+                    stage.classList.remove('is-filling');
+                    stage.classList.add('is-clearing');
+                    // 最后一层格子的 delay + 单格消失时长
+                    return wait(T.tileOut + (tileDiagSpan - 1) * T.stepOut + 60);
+                }
+
+                function stageD() {
+                    stage.classList.add('is-split');
+                    return wait(T.split);
+                }
+
+                function stageE() {
+                    if (ok) {
+                        // 成功：竖条继续移出，中间面板交给注入脚本过渡到 #chat
+                        stage.classList.add('is-leaving');
+                        return wait(T.morph).then(function () {
+                            return softNavigate(
+                                BASE_PATH + '/chatts?update=' + encodeURIComponent(result.token), true
+                            );
+                        });
+                    }
+                    // 失败：状态条淡出，还原表单并弹出 LOCKED
+                    stage.classList.remove('active');
+                    stage.classList.remove('is-split', 'is-filling', 'is-clearing',
+                        'is-ok', 'is-fail', 'is-leaving');
+                    tilesBuilt = false;
+                    tilesBox.innerHTML = '';
+                    restoreFormArea();
+                    setSubmitting(false);
+                    if (result.kind === 'net') {
+                        showError('连接失败', '无法连接到服务器，请检查网络');
+                    } else {
+                        showError('密码错误', '如果忘记了密码，请联系管理员');
+                    }
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                }
+
+                return wait(Math.max(0, T.minRun - (Date.now() - started)))
+                    .then(doneA)
+                    .then(stageC)
+                    .then(stageD)
+                    .then(stageE);
             }
 
             form.addEventListener('submit', function (event) {
@@ -732,7 +1164,7 @@
                 clearError();
                 setSubmitting(true);
 
-                fetch(BASE_PATH + '/login', {
+                var loginPromise = fetch(BASE_PATH + '/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: username, password: password })
@@ -740,32 +1172,39 @@
                     return response.json().then(function (data) {
                         return { ok: response.ok && !!data.ok, data: data };
                     }).catch(function () {
-                        return { ok: false, data: { error: '服务器响应异常' } };
+                        return { ok: false, data: {} };
                     });
-                }).then(function (result) {
-                    if (!result.ok) {
+                }).then(function (res) {
+                    if (res.ok && res.data.update) {
+                        return { kind: 'ok', token: res.data.update };
+                    }
+                    return { kind: 'fail' };
+                }).catch(function () {
+                    return { kind: 'net' };
+                });
+
+                if (reducedMotion) {
+                    // 降级：不放动画，直接按结果换档或就地报错
+                    loginPromise.then(function (result) {
+                        if (result.kind === 'ok') {
+                            softNavigate(
+                                BASE_PATH + '/chatts?update=' + encodeURIComponent(result.token), false
+                            );
+                            return;
+                        }
                         setSubmitting(false);
-                        showError('密码错误', '如果忘记了密码，请联系管理员');
+                        if (result.kind === 'net') {
+                            showError('连接失败', '无法连接到服务器，请检查网络');
+                        } else {
+                            showError('密码错误', '如果忘记了密码，请联系管理员');
+                        }
                         passwordInput.value = '';
                         passwordInput.focus();
-                        return;
-                    }
-                    var token = result.data.update;
-                    if (!token) {
-                        setSubmitting(false);
-                        showError('验证异常', '未获取到会话，请稍后重试');
-                        return;
-                    }
-                    // 地址栏同步为 /chatts?update=TOKEN，刷新后仍可凭 token 进入
-                    return softNavigate(
-                        BASE_PATH + '/chatts?update=' + encodeURIComponent(token)
-                    );
-                }).catch(function () {
-                    setSubmitting(false);
-                    showError('连接失败', '无法连接到服务器，请检查网络');
-                    passwordInput.value = '';
-                    passwordInput.focus();
-                });
+                    });
+                    return;
+                }
+
+                loginPromise.then(playAttempt);
             });
 
             // 重新输入时收起故障覆盖层
