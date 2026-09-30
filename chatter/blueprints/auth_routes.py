@@ -1,5 +1,5 @@
 """认证与页面路由：登录、登出、注册、错误页、聊天室主页。"""
-from flask import redirect, render_template, request, url_for
+from flask import jsonify, redirect, render_template, request, url_for
 
 from .. import auth, messages, permissions, plugin_manager, state, users
 from ..state import logger
@@ -25,6 +25,34 @@ def logout():
 @bp.route('/error')
 def error():
     return render_template('login_error.html')
+
+
+@bp.route('/login', methods=['POST'])
+def login_api():
+    """登录页 fetch 专用接口：成功返回 token，失败返回 JSON 错误（不跳 /error）。
+
+    与 /chatts 的表单分支互不影响——无 JS 的表单提交仍走原有的 302 → /error。
+    登录副作用（presence、打点、logger）统一由随后 GET /chatts?update= 触发，
+    避免同一账号在此处重复落一次会话。
+    """
+    users.reload_users()
+    payload = request.get_json(silent=True) or {}
+    candidate = (payload.get('username') or '').strip()
+    password = payload.get('password') or ''
+
+    if not candidate or candidate not in state.usernames:
+        return auth.json_error('用户名或密码错误', 401)
+
+    from werkzeug.security import check_password_hash
+    try:
+        valid_password = check_password_hash(
+            state.passwords[state.usernames.index(candidate)], password)
+    except (IndexError, ValueError, TypeError):
+        valid_password = False
+    if not valid_password:
+        return auth.json_error('用户名或密码错误', 401)
+
+    return jsonify({'ok': True, 'update': auth.save_login(candidate)})
 
 
 @bp.route('/chatts', methods=['GET', 'POST'])

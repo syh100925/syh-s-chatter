@@ -17,6 +17,9 @@
             --border-focus: #e0e0e0;
             --accent: #ffffff;
             --accent-hover-text: #1a1a1a;
+            --error-color: #ff6b6b;
+            --error-glow-1: #ff6b6b;
+            --error-glow-2: #ff4444;
             --font-mono: 'Jetbrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
             --transition-speed: 0.2s;
             --glow-text-1: #ffffff;
@@ -33,6 +36,9 @@
             --border-focus: #1a1a1a;
             --accent: #1a1a1a;
             --accent-hover-text: #ffffff;
+            --error-color: #d32f2f;
+            --error-glow-1: #d32f2f;
+            --error-glow-2: #b71c1c;
             --glow-text-1: #1a1a1a;
             --glow-text-2: #666666;
         }
@@ -130,6 +136,7 @@
 
         /* ========== 主容器 ========== */
         .login-container {
+            position: relative;
             width: 100%;
             max-width: 400px;
             padding: 0 2rem;
@@ -195,6 +202,32 @@
             100% {
                 opacity: 0;
                 transform: translateY(-5px);
+            }
+        }
+
+        /* 登录失败态：品牌词切换为 DENIED / BLOCKED 故障动画 */
+        .dynamic-word.is-error {
+            min-width: 90px;
+            color: var(--error-glow-1);
+        }
+        .dynamic-word.is-error span {
+            animation: errorWordCycle 3s infinite;
+        }
+        @keyframes errorWordCycle {
+            0%,
+            30% {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+            35%,
+            65% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            70%,
+            100% {
+                opacity: 0;
+                transform: translateY(-4px);
             }
         }
 
@@ -301,6 +334,134 @@
             transform: scale(0.98);
             transition: transform 0.08s;
         }
+        button[type="submit"]:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ========== 登录失败覆盖层（复用 login_error 的 LOCKED 故障动画） ========== */
+        .login-error {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: var(--bg-primary);
+            opacity: 0;
+            visibility: hidden;
+            /* 未激活时必须完全不接收指针事件：visibility 的淡出过渡期间元素
+               仍按 visible 处理，若不禁用会在 0.3s 内吞掉用户的重试点击 */
+            pointer-events: none;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .login-error.active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+        .error-animation-text {
+            font-size: 3.5rem;
+            font-weight: 500;
+            letter-spacing: 8px;
+            color: var(--error-glow-1);
+            text-transform: uppercase;
+            animation: errorTextFlicker 2.5s infinite;
+            line-height: 1.2;
+        }
+        @keyframes errorTextFlicker {
+            0%,
+            19%,
+            21%,
+            23%,
+            25%,
+            54%,
+            56%,
+            100% {
+                opacity: 1;
+                color: var(--error-glow-1);
+            }
+            20%,
+            24%,
+            55% {
+                opacity: 0.4;
+                color: var(--error-glow-2);
+            }
+        }
+        .error-message {
+            color: var(--fg-secondary);
+            font-size: 1rem;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+        .error-message .highlight {
+            color: var(--error-color);
+            font-weight: 500;
+            letter-spacing: 2px;
+            animation: highlightPulse 2s infinite;
+        }
+        @keyframes highlightPulse {
+            0%,
+            100% {
+                opacity: 0.85;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+        .error-hint {
+            margin-top: 1rem;
+            font-size: 0.7rem;
+            color: var(--fg-muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        /* 失败时表单整体轻微抖动 */
+        @keyframes errorShake {
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+            20% {
+                transform: translateX(-6px);
+            }
+            40% {
+                transform: translateX(5px);
+            }
+            60% {
+                transform: translateX(-3px);
+            }
+            80% {
+                transform: translateX(2px);
+            }
+        }
+        .login-error.active ~ .login-form-area {
+            animation: errorShake 0.4s ease;
+        }
+        /* 换档遮罩：淡出到背景色，遮住 document.write 重解析产生的白闪 */
+        .nav-fade {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-primary);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.18s ease;
+            z-index: 9999;
+        }
+        .nav-fade.active {
+            opacity: 1;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .login-error,
+            .nav-fade {
+                transition: none;
+            }
+            .login-error.active ~ .login-form-area {
+                animation: none;
+            }
+        }
 
         /* ========== 底部信息 ========== */
         .footer-note {
@@ -337,6 +498,13 @@
             .dynamic-word {
                 min-width: 60px;
                 font-size: 0.7rem;
+            }
+            .dynamic-word.is-error {
+                min-width: 78px;
+            }
+            .error-animation-text {
+                font-size: 2.6rem;
+                letter-spacing: 5px;
             }
         }
     </style>
@@ -398,7 +566,7 @@
         <!-- 品牌标识 - 动态文字替换了原来的图标 -->
         <div class="brand">
             <span class="dash"></span>
-            <span class="dynamic-word">
+            <span class="dynamic-word" id="brandWords">
                 <span>SECURE</span>
                 <span>ENCRYPT</span>
             </span>
@@ -413,35 +581,198 @@
         </div>
 
         <!-- 表单 -->
-        <form action="{{ base_path }}/chatts" method="POST" autocomplete="off">
-            <div class="form-control">
-                <input type="text" required name="username" id="username" placeholder=" " autocomplete="off">
-                <label for="username">Username</label>
-            </div>
-            <div class="form-control">
-                <input type="password" required name="password" id="password" placeholder=" " autocomplete="off">
-                <label for="password">Password</label>
-            </div>
-            <button type="submit">// 进入 //</button>
-        </form>
+        <div class="login-form-area">
+            <form action="{{ base_path }}/chatts" method="POST" autocomplete="off" id="loginForm">
+                <div class="form-control">
+                    <input type="text" required name="username" id="username" placeholder=" " autocomplete="off">
+                    <label for="username">Username</label>
+                </div>
+                <div class="form-control">
+                    <input type="password" required name="password" id="password" placeholder=" " autocomplete="off">
+                    <label for="password">Password</label>
+                </div>
+                <button type="submit" id="loginSubmit">// 进入 //</button>
+            </form>
 
-        <!-- 底部装饰 -->
-        <div class="footer-note">
-            <span>end-to-end</span>
-            <span class="dot-sep"></span>
-            <span>encrypted</span>
+            <!-- 底部装饰 -->
+            <div class="footer-note">
+                <span>end-to-end</span>
+                <span class="dot-sep"></span>
+                <span>encrypted</span>
 
-            <div style="margin-top: 1.5rem; font-size: 0.8rem; letter-spacing: 1px;">
-                <a href="{{ base_path }}/register" style="color: var(--fg-muted); text-decoration: none; border-bottom: 1px solid var(--border-color); padding-bottom: 2px; transition: color 0.2s;">
-                    没有账号？立即注册
-                </a>
+                <div style="margin-top: 1.5rem; font-size: 0.8rem; letter-spacing: 1px;">
+                    <a href="{{ base_path }}/register" style="color: var(--fg-muted); text-decoration: none; border-bottom: 1px solid var(--border-color); padding-bottom: 2px; transition: color 0.2s;">
+                        没有账号？立即注册
+                    </a>
+                </div>
+
+                {% if registered %}
+                    <br>
+                    <div style="color: var(--fg-secondary); margin-bottom: 1rem;">注册成功，请登录</div>
+                {% endif %}
             </div>
+        </div>
 
-            {% if registered %}
-                <br>
-                <div style="color: var(--fg-secondary); margin-bottom: 1rem;">注册成功，请登录</div>
-            {% endif %}
+        <!-- 登录失败就地提示（取代跳转到 /error 页） -->
+        <div class="login-error" id="loginError" role="alert" aria-live="assertive">
+            <div class="error-animation-text">LOCKED</div>
+            <div class="error-message">
+                <span class="highlight" id="loginErrorTitle">密码错误</span>，请重新登录。
+            </div>
+            <div class="error-hint" id="loginErrorHint">如果忘记了密码，请联系管理员</div>
         </div>
     </div>
+
+    <!-- 页面配置（挂载前缀等），见 _base_path 注入约定 -->
+    <script>
+        window.LOGIN_CONFIG = {
+            base_path: {{ base_path|tojson }}
+        };
+    </script>
+
+    <!-- ========== 登录（fetch 提交 + 无刷新换档） ========== -->
+    <script>
+        (function () {
+            'use strict';
+
+            var BASE_PATH = (window.LOGIN_CONFIG && window.LOGIN_CONFIG.base_path) || '';
+
+            var form = document.getElementById('loginForm');
+            var submitBtn = document.getElementById('loginSubmit');
+            var usernameInput = document.getElementById('username');
+            var passwordInput = document.getElementById('password');
+            var errorBox = document.getElementById('loginError');
+            var errorTitle = document.getElementById('loginErrorTitle');
+            var errorHint = document.getElementById('loginErrorHint');
+            var brandWords = document.getElementById('brandWords');
+            var DEFAULT_SUBMIT_TEXT = submitBtn.textContent;
+
+            // 正常品牌词与故障品牌词（失败时整体切换，与 login_error.html 视觉一致）
+            var NORMAL_WORDS = ['SECURE', 'ENCRYPT'];
+            var ERROR_WORDS = ['DENIED', 'BLOCKED'];
+
+            var submitting = false;
+
+            function setBrandWords(words, isError) {
+                var spans = brandWords.querySelectorAll('span');
+                for (var i = 0; i < spans.length; i++) {
+                    // 仅写入固定常量，不拼接任何服务端数据
+                    spans[i].textContent = words[i] || '';
+                }
+                brandWords.classList.toggle('is-error', !!isError);
+            }
+
+            function showError(title, hint) {
+                errorTitle.textContent = title;
+                errorHint.textContent = hint;
+                setBrandWords(ERROR_WORDS, true);
+                errorBox.classList.add('active');
+            }
+
+            function clearError() {
+                errorBox.classList.remove('active');
+                setBrandWords(NORMAL_WORDS, false);
+            }
+
+            function setSubmitting(flag) {
+                submitting = flag;
+                submitBtn.disabled = flag;
+                submitBtn.textContent = flag ? '// 验证中 //' : DEFAULT_SUBMIT_TEXT;
+            }
+
+            // 无刷新换档：fetch 目标页 HTML → 淡出到背景色遮住重解析白闪 →
+            // 整档替换并同步地址栏。
+            // document.open() 会重置文档并重建全局作用域，因此 chat.js 顶层的
+            // const BASE_PATH 可正常重新声明；document.close() 结束解析后同样会
+            // 重新触发 DOMContentLoaded，chat.js 的初始化照常执行。
+            function softNavigate(url) {
+                return fetch(url, { credentials: 'same-origin' }).then(function (response) {
+                    // 被重定向（会话失效等）或返回非 200 时放弃换档，走整页跳转兜底
+                    if (response.redirected || !response.ok) {
+                        window.location.assign(BASE_PATH + '/');
+                        return null;
+                    }
+                    return response.text();
+                }).then(function (html) {
+                    if (html === null) return;
+
+                    var fade = document.createElement('div');
+                    fade.className = 'nav-fade';
+                    document.body.appendChild(fade);
+                    // 强制回流以确保过渡生效
+                    void fade.offsetWidth;
+                    fade.classList.add('active');
+
+                    var reduced = window.matchMedia
+                        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    var delay = reduced ? 0 : 180;
+
+                    setTimeout(function () {
+                        // replaceState 而非 pushState：document.write 已不可逆地替换了
+                        // 本文档，pushState 会让浏览器后退时去恢复一个不存在的登录页。
+                        history.replaceState(null, '', url);
+                        document.open();
+                        document.write(html);
+                        document.close();
+                    }, delay);
+                });
+            }
+
+            form.addEventListener('submit', function (event) {
+                // JS 可用时走 fetch；脚本未加载/被禁用时表单仍可原生 POST 到
+                // /chatts，由服务端按原逻辑 302 到 /error 兜底。
+                if (typeof window.fetch !== 'function') return;
+                event.preventDefault();
+                if (submitting) return;
+
+                var username = (usernameInput.value || '').trim();
+                var password = passwordInput.value || '';
+                if (!username || !password) return;
+
+                clearError();
+                setSubmitting(true);
+
+                fetch(BASE_PATH + '/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username, password: password })
+                }).then(function (response) {
+                    return response.json().then(function (data) {
+                        return { ok: response.ok && !!data.ok, data: data };
+                    }).catch(function () {
+                        return { ok: false, data: { error: '服务器响应异常' } };
+                    });
+                }).then(function (result) {
+                    if (!result.ok) {
+                        setSubmitting(false);
+                        showError('密码错误', '如果忘记了密码，请联系管理员');
+                        passwordInput.value = '';
+                        passwordInput.focus();
+                        return;
+                    }
+                    var token = result.data.update;
+                    if (!token) {
+                        setSubmitting(false);
+                        showError('验证异常', '未获取到会话，请稍后重试');
+                        return;
+                    }
+                    // 地址栏同步为 /chatts?update=TOKEN，刷新后仍可凭 token 进入
+                    return softNavigate(
+                        BASE_PATH + '/chatts?update=' + encodeURIComponent(token)
+                    );
+                }).catch(function () {
+                    setSubmitting(false);
+                    showError('连接失败', '无法连接到服务器，请检查网络');
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                });
+            });
+
+            // 重新输入时收起故障覆盖层
+            form.addEventListener('input', function () {
+                if (errorBox.classList.contains('active') && !submitting) clearError();
+            });
+        })();
+    </script>
 </body>
 </html>

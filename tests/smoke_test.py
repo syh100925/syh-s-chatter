@@ -47,6 +47,11 @@ def main():
         assert r.status_code == 200 and b'login' in r.data.lower(), '应返回登录页'
         assert b"cursor:url('/static/cur-default.png')" in r.data, \
             '聊天室页面应注入自定义鼠标指针'
+        # 登录页应内嵌 fetch 登录 + 就地错误提示（不再依赖跳 /error）
+        assert b'id="loginError"' in r.data and b'id="brandWords"' in r.data, \
+            '登录页应包含就地错误提示与品牌词节点'
+        assert b'LOCKED' in r.data, '登录页应复用 LOCKED 故障动画'
+        assert b'/login' in r.data, '登录页脚本应指向 /login 接口'
 
         # 4. 注册新用户
         r = client.post('/register', data={
@@ -59,6 +64,37 @@ def main():
         # 5. 管理员登录
         r = client.post('/chatts', data={'username': 'admin', 'password': 'admin123'})
         assert r.status_code == 200, '管理员登录失败'
+        admin_token = extract_token(r.data.decode('utf-8'))
+
+        # 5b. /login JSON 接口（登录页 fetch 无刷新换档用）
+        r = client.post('/login', json={'username': 'admin', 'password': 'wrong-pass'})
+        assert r.status_code == 401, '错误密码应返回 401 而非跳转'
+        body = r.get_json()
+        assert body['ok'] is False and body['error'], '错误密码应返回 JSON 错误体'
+
+        r = client.post('/login', json={'username': 'no-such-user', 'password': 'x'})
+        assert r.status_code == 401 and r.get_json()['ok'] is False, '未知用户应返回 401'
+
+        r = client.post('/login', json={'username': 'admin', 'password': 'admin123'})
+        assert r.status_code == 200 and r.get_json()['ok'], '正确密码应登录成功'
+        json_token = r.get_json()['update']
+        # 返回的 token 可直接用于无刷新换档的目标页，且与页面内嵌 token 一致
+        r = client.get('/chatts?update=' + json_token)
+        assert r.status_code == 200, '用 /login 的 token 访问 /chatts 应成功'
+        assert extract_token(r.data.decode('utf-8')) == json_token, '页面 token 应与接口一致'
+
+        # 5c. 无 JS 兜底：表单 POST 失败仍维持 302 → /error
+        r = client.post('/chatts', data={'username': 'admin', 'password': 'wrong-pass'})
+        assert r.status_code == 302 and r.headers['Location'].endswith('/error'), \
+            '表单提交失败应仍跳转 /error（无 JS 兜底）'
+        r = client.get('/error')
+        assert r.status_code == 200, '/error 页应仍可访问'
+
+        # 5d. auth.save_login 每次登录都会轮换该用户的 token（覆盖旧值），因此 5b/5c
+        # 里对 admin 的多次登录已使第 5 步取得的 admin_token 失效。
+        # 这里重新登录并把后续用例使用的 admin_token 刷新为最新值。
+        r = client.post('/chatts', data={'username': 'admin', 'password': 'admin123'})
+        assert r.status_code == 200, '表单登录应成功'
         admin_token = extract_token(r.data.decode('utf-8'))
 
         # 6. 管理员发消息

@@ -40,9 +40,12 @@ def on_load(ctx):
     ''')
 
     # 4. 注入 JS（修改聊天室功能）
+    # 注意：注入脚本在 chat.js 之前执行，不能引用 chat.js 的顶层变量（如 BASE_PATH）。
+    # 页面配置统一从 window.CHAT_CONFIG 读取（见 templates/chat.html）。
     ctx.add_js('''
         // 在控制台输出插件加载状态
-        console.log('[plugin:hello_world] loaded, base_path=' + BASE_PATH);
+        var basePath = (window.CHAT_CONFIG && window.CHAT_CONFIG.base_path) || '';
+        console.log('[plugin:hello_world] loaded, base_path=' + basePath);
     ''')
 
     # 5. 工具集链接（以 / 开头按根路径定位，不再追加 base_path）
