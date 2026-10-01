@@ -97,7 +97,13 @@
     <p class="boot-line"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg> {{ site_title }} boot complete <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg></p>
 
     <div id="chat" class="page-enter">
-        <div class="chat-header"><p>{{ site_title }}</p></div>
+        <div class="chat-header">
+            <p class="chat-title">{{ site_title }}</p>
+            <!-- 用户信息折进标题行：在线状态变化极少，原来单独占一整行不值当 -->
+            <div class="user-info">
+                <div class="online-status"><span class="online-dot"></span><span class="online-label">在线</span><div class="user-tags" id="userTags"></div></div>
+            </div>
+        </div>
         <div class="chat-divider"></div>
         <div style="padding-left:8px;padding-right:8px;">
             <p class="system-message">[聊天室]: <span>IP checked ......</span></p>
@@ -115,11 +121,7 @@
             <button class="share-btn" id="cancelSelectBtn" style="display:none;"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg> 取消选择</button>
         </div>
 
-        <!-- 用户信息 -->
-        <div class="user-info">
-            <p class="user-name"><span class="user-avatar-inline">{{ username[0].upper() }}</span>{{ username }}</p>
-            <div class="online-status"><span class="online-dot"></span><span class="online-label">在线</span><div class="user-tags" id="userTags"></div></div>
-        </div>
+        <!-- 用户信息已折进 .chat-header -->
 
         <!-- 输入区域 -->
         <div id="chat-combined">
