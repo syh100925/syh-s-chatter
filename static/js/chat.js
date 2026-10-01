@@ -2800,6 +2800,17 @@ function loadHtml2Canvas() {
                 const w = createDraggableWindow('<svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> 管理面板', '<div class="admin-loading">加载中...</div>', false, 'admin');
                 w.style.width = '900px';
                 w.style.height = 'min(600px, 72vh)';   // 固定窗口高度，管理面板撑满
+                // createDraggableWindow 是按默认 600x400 估的位置，而这里把宽度
+                // 改成了 900px —— 于是窗口实际是「按 600 居中、却有 900 宽」，
+                // 右侧溢出视口（实测 1280px 下右缘到 1332px，超出 52px）。
+                // 按真实尺寸重新居中，并夹进视口内。
+                (function centerAdminWindow() {
+                    const ww = w.offsetWidth, wh = w.offsetHeight;
+                    w.style.left = Math.max(16, Math.min(
+                        (window.innerWidth - ww) / 2, window.innerWidth - ww - 16)) + 'px';
+                    w.style.top = Math.max(16, Math.min(
+                        (window.innerHeight - wh) / 2, window.innerHeight - wh - 16)) + 'px';
+                })();
                 const c = w.querySelector('.window-content');
                 c.style.flex = '1';
                 c.style.maxHeight = 'none';
