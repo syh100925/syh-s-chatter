@@ -94,7 +94,8 @@
     </div>
 
     <!-- ========== 主聊天区域 ========== -->
-    <p class="boot-line"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg> {{ site_title }} boot complete <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg></p>
+    <!-- 原先这里还有一行 P.boot-line（"… boot complete"），和标题行重复报了两次
+         站点名，且它比标题更小、视觉上更弱。已并入 .chat-header，不再单列。 -->
 
     <div id="chat" class="page-enter">
         <div class="chat-header">

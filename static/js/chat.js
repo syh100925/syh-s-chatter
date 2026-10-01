@@ -147,7 +147,7 @@ function loadHtml2Canvas() {
                 if (realSd && cloneSd) cloneSd.scrollTop = realSd.scrollTop;
                 // 遮罩内克隆体静态展示目标主题：禁用入场动画，避免圆扩散期间
                 // 组件"重绘/重播动画"，遮罩消失时与真实页面无缝衔接
-                clone.querySelectorAll('#chat, .chat-header, .chat-divider, .system-message, .user-info, #chat-combined, .boot-line, .theme-toggle, .appearance-btn, .tools-btn, .admin-entry-btn, #sd, .admin-standalone').forEach(n => { n.style.animation = 'none'; });
+                clone.querySelectorAll('#chat, .chat-header, .chat-divider, .system-message, .user-info, #chat-combined, .theme-toggle, .appearance-btn, .tools-btn, .admin-entry-btn, #sd, .admin-standalone').forEach(n => { n.style.animation = 'none'; });
                 const mi = clone.querySelector('#modeIndicator');
                 if (mi) mi.textContent = settings.theme === 'light' ? '亮' : '暗';
                 // 2. 遮罩容器承载克隆体，从按钮中心扩散

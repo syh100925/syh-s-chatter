@@ -179,6 +179,11 @@
             background: var(--fg-primary);
             color: var(--bg-primary);
         }
+        /* 聊天主容器：改为纵向 grid。
+           消息区占 minmax(0,1fr) 吃掉剩余高度，于是「标题 / 分隔线 / 系统消息 /
+           消息流 / 输入区」里只有输入区是固定高度，页面整体恒等于一屏——
+           不再出现矮屏把输入区顶出视口、或长屏留一大片空白的情况。
+           100dvh 而非 100vh：移动端浏览器地址栏收起/展开时 100vh 会跳。 */
         #chat {
             position: relative;
             z-index: 10;
@@ -186,11 +191,17 @@
             max-width: 1000px;
             background: transparent;
             border: 1px solid var(--border-color);
-            padding: 24px 20px;
+            padding: 14px 20px 16px;
+            display: grid;
+            grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+            grid-template-columns: minmax(0, 1fr);
+            height: calc(100dvh - 40px);
         }
         /* 标题行：左侧站名 + 右侧在线状态。
            选择器必须是 .chat-title 而不是裸的 p —— 用户信息折进来之后，
-           .user-name 也曾经是 <p>，用 `.chat-header p` 会把它一起放大。 */
+           .user-name 也曾经是 <p>，用 `.chat-header p` 会把它一起放大。
+           字号从 1.8rem 降到 1rem：原先它是全页最大的字，而对话这个主角
+           反而没有任何强调——视觉重量是倒挂的。 */
         .chat-header {
             display: flex;
             align-items: center;
@@ -199,10 +210,10 @@
             min-width: 0;
         }
         .chat-header .chat-title {
-            font-size: 1.8rem !important;
+            font-size: 1rem !important;
             letter-spacing: 4px;
             color: var(--fg-primary) !important;
-            margin-bottom: 12px;
+            margin: 0;
             text-transform: uppercase;
             font-weight: 400;
             min-width: 0;
@@ -212,7 +223,7 @@
         }
         .chat-divider {
             border-top: 1px solid var(--border-color) !important;
-            margin: 12px 0;
+            margin: 10px 0;
         }
         .system-message {
             color: var(--system-text) !important;
@@ -236,14 +247,17 @@
                 opacity: 1;
             }
         }
-        /* 高度用 clamp：矮屏自动收缩、长屏最多到 520px。
-           注意这里只是比原来的固定 45vh 稍宽一点——「消息区吃掉剩余空间、
-           永不溢出视口」要靠 #chat 的 grid + 100dvh，那属于下一版。 */
+        /* 消息流：grid 第 4 行，吃掉剩余高度。不再描边（上一版已去）——
+           分组交给气泡底色与头像。
+           min-height:0 是必须的：grid 子项默认 min-height:auto，会被内容
+           顶破 minmax(0,1fr)，那样 overflow-y:auto 就永远不会滚。 */
         #sd {
+            grid-row: 4;
+            grid-column: 1;
+            min-height: 0;
             background: transparent;
             border: none;
             padding: 4px 2px !important;
-            height: clamp(200px, 46vh, 520px);
             overflow-y: auto;
             scroll-behavior: smooth;
         }
@@ -1961,19 +1975,41 @@
         }
 
         /* ===== 🆕 分享工具栏 & 选择模式 ===== */
-        /* 分享工具栏：从描边盒降级为无框文字行。
-           按钮本身仍有各自的描边（.share-btn），所以操作性不丢，
-           少的是容器与消息列表/输入区争夺的那层框。 */
+        /* 分享工具栏：与 #sd 放在同一个 grid 单元里，右上角浮起。
+           它作用于消息而不是输入，所以贴着消息区比夹在两者之间更合理。
+
+           常态保持可见可点、只是压低存在感（opacity .55、无边框）；
+           进入选中模式（#sd.select-mode，由 chat.js 打上）才完全显形。
+           早先试过「常态 opacity:0 + pointer-events:none，选中时才淡入」，
+           结果连「选择消息」这个入口本身一起消失了，选中模式根本进不去——
+           浮在内容之上的东西必须始终可点，只能弱化、不能隐藏。 */
         #share-toolbar {
+            grid-row: 4;
+            grid-column: 1;
+            justify-self: end;
+            align-self: start;
+            z-index: 3;
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 6px 2px;
-            border: none;
-            margin: 4px 0 8px 0;
+            padding: 4px 8px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            margin: 0;
             flex-wrap: wrap;
+            justify-content: flex-end;
             background: transparent;
-            transition: all var(--transition-speed);
+            opacity: 0.55;
+            transition: opacity 0.2s ease, border-color 0.2s ease,
+                background-color 0.2s ease;
+        }
+        #share-toolbar:hover {
+            opacity: 1;
+        }
+        #sd.select-mode ~ #share-toolbar {
+            opacity: 1;
+            background: var(--bg-primary);
+            border-color: var(--border-color);
         }
         #share-toolbar .share-btn {
             background: transparent;
@@ -2245,16 +2281,17 @@
             .text-field {
                 flex: 1 1 100%;
             }
-            /* 窄屏上标题行与在线状态会挤，标题优先占满、状态换行到下一行 */
+            /* 窄屏上标题与在线状态挤在一行，标题优先占满、状态换到下一行 */
             .chat-header {
                 flex-wrap: wrap;
             }
             .chat-header .chat-title {
                 flex: 1 1 100%;
             }
-            /* 窄屏可用高度更少，消息区必须再收一档，否则整页会超出视口 */
-            #sd {
-                height: clamp(160px, 38vh, 320px);
+            /* #chat 的高度按 body 的 padding 反推：窄屏 body padding 也是 20px，
+               故仍为 100dvh-40px。#sd 由 grid 分配剩余高度，这里不再设 height。 */
+            #chat {
+                padding: 12px 14px 14px;
             }
         }
     
@@ -2270,14 +2307,6 @@
             justify-content: center;
             font-size: 12px;
             margin-right: 6px;
-        }
-        .boot-line {
-            color: var(--fg-muted);
-            align-self: flex-start;
-            margin-left: 15px;
-            margin-bottom: 8px;
-            font-size: 0.8rem;
-            letter-spacing: 2px;
         }
         .admin-entry-btn {
             position: fixed;
@@ -3786,10 +3815,6 @@
     animation: fadeInUp 0.5s ease-out 0.4s both;
 }
 
-.boot-line {
-    animation: fadeInUp 0.5s ease-out 0.05s both;
-}
-
 /* 悬浮按钮错峰入场 */
 .theme-toggle {
     animation: fadeInUp 0.5s ease-out 0.15s both;
@@ -3825,7 +3850,6 @@
             .system-message,
             .user-info,
             #chat-combined,
-            .boot-line,
             .theme-toggle,
             .appearance-btn,
             .tools-btn,
@@ -3963,12 +3987,6 @@
 .emoji-delete-btn .icon,
 .reply-compose > .icon {
     pointer-events: none;
-}
-
-.boot-line .icon {
-    width: 0.8em;
-    height: 0.8em;
-    opacity: 0.7;
 }
 
 .preview-header .icon {
