@@ -1711,11 +1711,19 @@
             // 换档时注入：把长方形终态精确落到真实 #chat 的矩形上。
             // document.open() 会销毁本页 JS 上下文，此处只能把代码以字符串形式
             // 注入目标页 —— 时长与配色在此内联为字面量。
-            function buildMorphInject(token) {
+            function buildMorphInject(token, fromRect) {
+                // 起点：登录框（.auth-frame）在换档那一刻的真实矩形。
+                // 必须由登录页在 document.open() 之前量好——换档后旧文档已销毁，
+                // 新文档里再也取不到这个矩形。
+                var S = fromRect
+                    ? '{l:' + Math.round(fromRect.l) + ',t:' + Math.round(fromRect.t)
+                        + ',w:' + Math.round(fromRect.w) + ',h:' + Math.round(fromRect.h) + '}'
+                    : 'null';
                 return '<style id="auth-morph-style">'
                     + '#auth-morph-stage{position:fixed;inset:0;z-index:10001;'
                     + 'pointer-events:none;overflow:hidden}'
                     + '#auth-morph-center{position:absolute;background:var(--bg-primary);'
+                    + 'box-sizing:border-box;border:1px solid var(--border-color);'
                     + 'transform-origin:center center;transition:none}'
                     + '@media (prefers-reduced-motion: reduce){ #auth-morph-center{transition:none}}'
                     // morph 期间把聊天室的浮层整体压住。#chat 之外的浮层
@@ -1734,25 +1742,43 @@
                     + '<script>(function(){var d=document.getElementById("auth-morph-center");'
                     + 'var s=document.getElementById("auth-morph-stage");'
                     + 'var v=document.getElementById("auth-morph-veil");'
-                    + 'function place(sel,anim){var t=document.querySelector(sel);'
+                    // 起点矩形（登录框），换档前由登录页量好传进来
+                    + 'var S=' + S + ';'
+                    + 'function place(sel,anim,instant){var t=document.querySelector(sel);'
                     + 'if(!t){return false;}var r=t.getBoundingClientRect();'
                     + 'if(!r.width||!r.height){return false;}'
                     // 记录落位依据的矩形，便于验证「精确落到 #chat 的矩形」
                     + 'window.__AUTH_MORPH_FROM={l:Math.round(r.left),t:Math.round(r.top),'
                     + 'w:Math.round(r.width),h:Math.round(r.height),sel:sel};'
-                    + 'd.style.transition="none";'
+                    // instant：没有起点可用（拿不到登录框矩形）时直接落位。
+                    // 否则必须「先开过渡、再改终值」——反过来先 transition:none
+                    // 改终值、之后再开过渡，此时已无待过渡的变化，面板会直接
+                    // 出现在终值上，morph 就退化成一块矩形原地停留。
+                    + 'if(instant){d.style.transition="none";'
                     + 'd.style.left=r.left+"px";d.style.top=r.top+"px";'
                     + 'd.style.width=r.width+"px";d.style.height=r.height+"px";'
-                    + 'void d.offsetWidth;'
-                    + 'd.style.transition=anim;return true;}'
+                    + 'void d.offsetWidth;return true;}'
+                    + 'd.style.transition=anim;'
+                    + 'd.style.left=r.left+"px";d.style.top=r.top+"px";'
+                    + 'd.style.width=r.width+"px";d.style.height=r.height+"px";'
+                    + 'return true;}'
                     + 'function run(){'
                     // #chat 自带 fadeInUp 入场（含 translateY），测量前先摘掉，
                     // 否则量到的是动画中间态的矩形（与 chat.js 主题切换同一做法）
                     + 'var c=document.getElementById("chat");'
                     + 'if(c){c.style.animation="none";}'
                     + 'void document.body.offsetWidth;'
-                    + 'var ok=place("#chat","all ' + T.morph + 'ms ease");'
-                    + 'if(!ok){ok=place("#body","all ' + T.morph + 'ms ease");}'
+                    // 起点：把面板摆到登录框矩形并刷出初始态（transition:none），
+                    // 之后 place() 打开过渡再改终值，才真的长得过去。
+                    + 'var hasStart=!!(S&&S.w>1&&S.h>1);'
+                    + 'if(hasStart){'
+                    + 'd.style.transition="none";'
+                    + 'd.style.left=S.l+"px";d.style.top=S.t+"px";'
+                    + 'd.style.width=S.w+"px";d.style.height=S.h+"px";'
+                    + 'window.__AUTH_MORPH_START={l:S.l,t:S.t,w:S.w,h:S.h};'
+                    + 'void d.offsetWidth;}'
+                    + 'var ok=place("#chat","all ' + T.morph + 'ms ease",!hasStart);'
+                    + 'if(!ok){ok=place("#body","all ' + T.morph + 'ms ease",!hasStart);}'
                     // #chat 的高度由消息渲染驱动，而消息是 morph 落位之后才陆续
                     // 拉取并渲染的，真实矩形会再长高（实测约 40px）。若到点直接
                     // 撤掉遮罩，遮罩会停在旧矩形上，底部露出一截真实内容。
@@ -1791,7 +1817,16 @@
                 }).then(function (html) {
                     if (html === null) return;
                     if (withMorph) {
-                        html = html.replace('</body>', buildMorphInject(url) + '</body>');
+                        // morph 的起点：此刻登录框的真实矩形。必须在换档前量——
+                        // document.open() 之后旧文档已销毁，新文档取不到了。
+                        var fromRect = (function () {
+                            var f = document.getElementById('authFrame');
+                            if (!f) return null;
+                            var r = f.getBoundingClientRect();
+                            if (!(r.width > 1 && r.height > 1)) return null;
+                            return { l: r.left, t: r.top, w: r.width, h: r.height };
+                        })();
+                        html = html.replace('</body>', buildMorphInject(url, fromRect) + '</body>');
                     }
                     // 关键：document.open() 会立刻清空当前文档，而新文档的
                     // body 背景是靠 chat.css 里的 body{background:var(--bg-primary)}
