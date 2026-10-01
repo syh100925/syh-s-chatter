@@ -794,17 +794,17 @@
             height: var(--auth-bar-h);
             margin-top: calc(var(--auth-bar-h) / -2);
             opacity: 0;
-            /* 本体只比页面底色亮一档；状态色交给描边 */
-            background: var(--bg-secondary);
-            border: 1px solid var(--fg-muted);
+            /* 纯色填充：结果态直接把底色换成状态色，不再靠描边表示状态。
+               未出结果时用一档中性色，视觉上仍是实心长方形。 */
+            background: var(--fg-muted);
             transition: transform 0.5s ease, opacity 0.3s ease,
-                border-color 0.3s ease;
+                background-color 0.3s ease;
         }
         .auth-stage.is-ok .auth-bar {
-            border-color: var(--ok-color);
+            background: var(--ok-color);
         }
         .auth-stage.is-fail .auth-bar {
-            border-color: var(--error-color);
+            background: var(--error-color);
         }
         /* 未拉开时两条贴合在长方形中点 */
         .auth-bar-l {
