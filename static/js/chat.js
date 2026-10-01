@@ -11,6 +11,28 @@ function can(permission) {
     return list.indexOf('*') !== -1 || list.indexOf(permission) !== -1;
 }
 
+// html2canvas 按需加载。这个库只有点「生成分享图片」时才用得上，却托管在
+// 第三方 CDN 上：若把它放进 <head>（哪怕加 defer），CDN 一旦慢或不可达，脚本请求
+// 会一直挂着，而 defer 脚本会一直阻塞 DOMContentLoaded —— 本文件的全部初始化
+// 都挂在那个事件上（见下方监听器），结果整个聊天室都不启动。
+// 改成用到时才注入脚本：页面功能与登录换档都不再依赖第三方可用性。
+let _h2cPromise = null;
+function loadHtml2Canvas() {
+    if (window.html2canvas) return Promise.resolve(window.html2canvas);
+    if (_h2cPromise) return _h2cPromise;
+    _h2cPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+        s.onload = () => (window.html2canvas ? resolve(window.html2canvas) : reject(new Error('html2canvas 未就绪')));
+        s.onerror = () => reject(new Error('html2canvas 加载失败'));
+        document.head.appendChild(s);
+    }).catch(err => {
+        _h2cPromise = null;   // 允许下次重试
+        throw err;
+    });
+    return _h2cPromise;
+}
+
         document.addEventListener('DOMContentLoaded', function() {
 
             // ================================================================
@@ -2498,7 +2520,7 @@ function can(permission) {
             });
 
             // ---- 生成分享图片 ----
-            document.getElementById('generateShareBtn').addEventListener('click', function() {
+            document.getElementById('generateShareBtn').addEventListener('click', async function() {
                 if (selectedIds.size === 0) {
                     alert('请至少选择一条消息');
                     return;
@@ -2523,6 +2545,13 @@ function can(permission) {
                 }
                 if (selectedMsgs.length === 0) {
                     alert('未找到选中的消息，请重新选择');
+                    return;
+                }
+                // 按需拉取 html2canvas（第三方 CDN，可能失败；页面其余功能不依赖它）
+                try {
+                    await loadHtml2Canvas();
+                } catch (err) {
+                    alert('截图组件加载失败，请检查网络后重试');
                     return;
                 }
                 // 按时间排序（时间字符串排序可能不准确，但大致可用）

@@ -50,7 +50,9 @@
 
         @font-face {
             font-family: 'Jetbrains Mono';
-            src: url('static/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+            /* 这段样式内联在页面里，url() 会相对页面地址解析，因此必须带上挂载前缀，
+               否则 base_path 非空时会解析成 /static/fonts/… 而漏掉前缀。 */
+            src: url('{{ base_path }}/static/fonts/JetBrainsMono-Medium.woff2') format('woff2');
             font-weight: normal;
             font-style: normal;
             font-display: swap;
@@ -1290,10 +1292,25 @@
             function startClock() {
                 var t0 = Date.now();
                 stopClock();
-                clockIv = setInterval(function () {
+                clockIv = trackIv(setInterval(function () {
                     var s = (Date.now() - t0) / 1000;
                     hudClock.textContent = '00:' + pad(s < 10 ? '0' + s.toFixed(1) : s.toFixed(1), 4);
-                }, 100);
+                }, 100));
+            }
+
+            // 登录页创建的所有定时器都登记在这里，换档前统一清掉。
+            // 起因：document.open() 换档并不会重建 JS 全局对象（实测 window 跨
+            // 换档存活），旧闭包连同它们引用的节点会被永久保留。所以不能指望
+            // 「文档没了回调自然停」——必须显式清理，否则就是持续泄漏。
+            var TIMERS = { iv: [], to: [] };
+
+            function trackIv(id) { TIMERS.iv.push(id); return id; }
+            function trackTo(id) { TIMERS.to.push(id); return id; }
+
+            function teardownTimers() {
+                TIMERS.iv.forEach(function (id) { clearInterval(id); });
+                TIMERS.to.forEach(function (id) { clearTimeout(id); });
+                TIMERS = { iv: [], to: [] };
             }
 
             function stopClock() {
@@ -1315,7 +1332,7 @@
             }
 
             function wait(ms) {
-                return new Promise(function (resolve) { setTimeout(resolve, ms); });
+                return new Promise(function (resolve) { trackTo(setTimeout(resolve, ms)); });
             }
 
             // 依长方形实际布局尺寸建自适应网格；delay 按「距右上角的切比雪夫距离」
@@ -1484,7 +1501,20 @@
                     + 'void document.body.offsetWidth;'
                     + 'var ok=place("#chat","all ' + T.morph + 'ms ease");'
                     + 'if(!ok){ok=place("#body","all ' + T.morph + 'ms ease");}'
-                    + 'if(ok){setTimeout(function(){s.remove();},'+ T.morph + '+60);}'
+                    // #chat 的高度由消息渲染驱动，而消息是 morph 落位之后才陆续
+                    // 拉取并渲染的，真实矩形会再长高（实测约 40px）。若到点直接
+                    // 撤掉遮罩，遮罩会停在旧矩形上，底部露出一截真实内容。
+                    // 撤掉前先「无过渡」对齐到当前真实矩形 —— 与 remove 在同一个
+                    // 同步块内完成，中间不会产生任何一帧，视觉上察觉不到。
+                    + 'if(ok){setTimeout(function(){'
+                    + 'var r=c.getBoundingClientRect();'
+                    + 'if(r.width&&r.height){d.style.transition="none";'
+                    + 'd.style.left=r.left+"px";d.style.top=r.top+"px";'
+                    + 'd.style.width=r.width+"px";d.style.height=r.height+"px";'
+                    // 记录对齐后的最终矩形，便于验证「撤罩时确实盖住了真实 #chat」
+                    + 'window.__AUTH_MORPH_FINAL={l:Math.round(r.left),t:Math.round(r.top),'
+                    + 'w:Math.round(r.width),h:Math.round(r.height)};}'
+                    + 's.remove();},'+ T.morph + '+60);}'
                     + 'else{s.remove();}}'
                     + 'if(document.readyState==="loading"){'
                     + 'document.addEventListener("DOMContentLoaded",run);}else{run();}'
@@ -1525,6 +1555,11 @@
                     var delay = reduced ? 0 : 180;
 
                     setTimeout(function () {
+                        // 换档前清掉登录页所有定时器：document.open() 不会重建全局
+                        // 对象，留着的闭包会一直引用旧 DOM（实测前沿带 30ms 循环
+                        // 在换档后仍在跑）。放在这个回调开头即可 —— 该 timeout
+                        // 本身已经在执行，清它无害。
+                        teardownTimers();
                         // replaceState 而非 pushState：document.write 已不可逆地替换了
                         // 本文档，pushState 会让浏览器后退时去恢复一个不存在的登录页。
                         history.replaceState(null, '', url);
@@ -1555,8 +1590,14 @@
                 var total = tileDiagSpan;
                 var t0 = Date.now();
                 var lastDiag = -1;
-                var iv = setInterval(function () {
-                    if (!stage.classList.contains('active')) { clearInterval(iv); return; }
+                var iv = trackIv(setInterval(function () {
+                    // 必须同时判 isConnected：换档时 document.open() 只清空文档，
+                    // 旧节点上仍带着 active，只看 class 的话这个循环永远不会自杀，
+                    // 会每 30ms 继续对 220 个已脱离文档的格子写样式 —— 既烧 CPU，
+                    // 又让整个旧 realm（含全部格子节点）一直被闭包引用着。
+                    if (!stage.isConnected || !stage.classList.contains('active')) {
+                        clearInterval(iv); return;
+                    }
                     var diag = Math.min(total - 1,
                         Math.floor((Date.now() - t0) / T.stepIn));
                     if (diag === lastDiag) return;
@@ -1566,11 +1607,10 @@
                     for (var d = 0; d <= diag && d < total; d++) filled += tileGroups[d].length;
                     setHudProgress(filled, tileTotal);
                     lastDiag = diag;
-                }, 30);
+                }, 30));
             }
 
             // 阶段 B~E：结果 → 消格 → 状态条拉开 → 终态
-            // 阶段 B~E：结果 → 消格 → 状态条拉开 → 终态。
             // 请求已在铺开动画播完后发出，故此处只需 gapFill 的小间隔。
             function playAttempt(result) {
                 var ok = result.kind === 'ok';

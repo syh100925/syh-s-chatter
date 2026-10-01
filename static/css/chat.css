@@ -82,7 +82,10 @@
         }
         @font-face {
             font-family: 'Jetbrains Mono';
-            src: url('static/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+            /* 相对本 CSS 文件（/static/css/）解析，故须用 ../fonts/。
+               原先写成 'static/fonts/…' 会被解析成 /static/css/static/fonts/…，
+               必然 404；相对路径同时天然兼容 base_path 前缀。 */
+            src: url('../fonts/JetBrainsMono-Medium.woff2') format('woff2');
             font-weight: normal;
             font-style: normal;
             font-display: swap;
