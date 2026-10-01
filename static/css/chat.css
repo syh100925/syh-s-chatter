@@ -22,6 +22,9 @@
             --mention-color: #ffaa00;
             --mention-bg: rgba(255, 170, 0, 0.15);
             --font-mono: 'Jetbrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+            /* 右栏宽度。放在 :root 而不是 .app-shell 上，是为了让 body 直属的
+               .cmd-terminal 也能引用它——终端吸出时要停在右栏左侧而不是压上去。 */
+            --rail-w: 264px;
             --transition-speed: 0.15s;
             --error-color: #ff6b6b;
             --term-success: #46d160;
@@ -179,6 +182,55 @@
             background: var(--fg-primary);
             color: var(--bg-primary);
         }
+        /* ===== 应用外壳：左对话 + 右栏 =====
+           右栏收编了原先 4 个 position:fixed 悬浮按钮（z-index 9997~9999）
+           与 .cmd-sidebar。悬浮按钮彼此靠 right/bottom 硬编码坐标错开、
+           永远压着内容；cmd-sidebar 还垂直居中、max-height 60vh，会直接盖住
+           消息。收进同一个 grid 后这些都不再是定位问题。 */
+        .app-shell {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) var(--rail-w);
+            gap: 14px;
+            width: 100%;
+            max-width: calc(1000px + var(--rail-w) + 14px);
+            height: calc(100dvh - 40px);
+        }
+        .app-rail {
+            position: relative;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 0;
+            min-height: 0;
+        }
+        .rail-block {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 0;
+        }
+        .rail-block-grow {
+            flex: 1 1 auto;
+            overflow-y: auto;
+        }
+        .rail-h {
+            margin: 0;
+            font-size: 0.56rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            opacity: 0.75;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .rail-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
         /* 聊天主容器：改为纵向 grid。
            消息区占 minmax(0,1fr) 吃掉剩余高度，于是「标题 / 分隔线 / 系统消息 /
            消息流 / 输入区」里只有输入区是固定高度，页面整体恒等于一屏——
@@ -195,7 +247,12 @@
             display: grid;
             grid-template-rows: auto auto auto minmax(0, 1fr) auto;
             grid-template-columns: minmax(0, 1fr);
-            height: calc(100dvh - 40px);
+            /* 宽高交给 .app-shell 的 grid 列管：整页高度由外壳决定，
+               #chat 自己不再计算 100dvh，否则两处各算一遍必然对不上。 */
+            width: 100%;
+            max-width: none;
+            height: 100%;
+            min-height: 0;
         }
         /* 标题行：左侧站名 + 右侧在线状态。
            选择器必须是 .chat-title 而不是裸的 p —— 用户信息折进来之后，
@@ -789,9 +846,13 @@
         /* ===== 终端反馈区（快捷指令左侧，滑出/自动缩回） ===== */
         .cmd-terminal {
             position: fixed;
-            right: 252px;
+            /* 原为硬编码 right:252px，是按「没有右栏」的世界调的。右栏出现后
+               252px 会把终端推进右栏内部（实测 1440px 下终端压住 rail）。
+               改为停在右栏左侧：栏宽 + 间距 + 16px 留白。 */
+            right: calc(var(--rail-w) + 30px);
             top: 50%;
-            transform: translateY(-50%) translateX(calc(100% + 234px));
+            /* 收起时向右滑出。要滑出整个视口之外，而不是停在右栏上面。 */
+            transform: translateY(-50%) translateX(calc(100% + var(--rail-w) + 40px));
             width: 340px;
             max-height: 60vh;
             display: flex;
@@ -809,7 +870,14 @@
             opacity: 1;
             visibility: visible;
         }
-        /* 已拖动过：位置由 left/top 决定，禁用滑入动画（保留淡入淡出） */
+        /* 自动摆位（未拖动时由 JS 量几何写 left/top）：只接管定位，不改淡入淡出。
+   不复用 .dragged —— 它会连带关掉滑入动画。 */
+.cmd-terminal.term-auto {
+    transform: none;
+    transition: opacity 0.25s ease, visibility 0.25s;
+}
+
+/* 已拖动过：位置由 left/top 决定，禁用滑入动画（保留淡入淡出） */
         .cmd-terminal.dragged {
             transform: none;
             transition: opacity 0.25s ease, visibility 0.25s;
@@ -3998,4 +4066,152 @@
 .admin-footer .icon {
     margin-left: 4px;
     vertical-align: -2px;
+}
+
+/* ============================================================================
+   右栏内的入口按钮：把 4 个悬浮按钮从 fixed 改为常规流。
+   放在文件末尾以确保覆盖掉前面所有旧规则——它们的定义散落在 114~2366 行，
+   且后面还有 .theme-toggle{right:28px} / .tools-btn{right:90px} 这类
+   纯坐标覆盖，选择器同权重、靠后生效。
+   ========================================================================= */
+.rail-actions .theme-toggle,
+.rail-actions .appearance-btn,
+.rail-actions .tools-btn,
+.rail-actions .admin-entry-btn {
+    position: static;
+    right: auto;
+    bottom: auto;
+    z-index: auto;
+    transform: none;
+}
+.rail-actions .tools-btn,
+.rail-actions .admin-entry-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    font-size: 1.15rem;
+    cursor: pointer;
+}
+.rail-actions .appearance-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.rail-actions .theme-toggle {
+    padding: 8px 12px;
+    font-size: 0.78rem;
+    letter-spacing: 1px;
+    width: 100%;
+    text-align: left;
+}
+/* 右栏窄，圆形按钮改成方形小格；网格自动换行，不再需要手工错开坐标 */
+.rail-actions .admin-entry-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ---- cmd-sidebar 收进右栏 ----
+   原样式是 position:fixed; right:18px; top:50%; transform:translateY(-50%);
+   max-height:60vh —— 垂直居中悬在页面右侧，直接盖住消息。改为常规流块，
+   由 .rail-block-grow 提供滚动。 */
+.app-rail .cmd-sidebar {
+    position: static;
+    right: auto;
+    top: auto;
+    transform: none;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    /* 既有规则 @media (max-width:1180px) 会把 .cmd-sidebar 整个 display:none
+       —— 那是因为它当时是 fixed 悬浮层、窄屏会与内容争位置。现在它在自己的
+       抽屉里，不再争位置，故恢复显示。本规则选择器权重也更高、位置更靠后。 */
+    display: block;
+}
+.app-rail .cmd-sidebar > p {
+    margin: 0 0 8px;
+    font-size: 0.56rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    opacity: 0.75;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border-color);
+}
+.app-rail .cmd-sidebar .command-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.app-rail .cmd-sidebar .cmd-btn {
+    width: 100%;
+    text-align: left;
+}
+
+/* ============================================================================
+   窄屏：右栏折叠成抽屉。
+   ≤1180px 起单栏，右栏改为由 #railToggle 唤出的 off-canvas 抽屉；
+   ≤760px 抽屉占 84vw。抽屉打开时用 .app-shell.rail-open 标记。
+   ========================================================================= */
+.rail-toggle {
+    display: none;
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    z-index: 10000;
+    width: 44px;
+    height: 44px;
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--fg-primary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 1180px) {
+    .app-shell {
+        grid-template-columns: minmax(0, 1fr);
+        max-width: 1000px;
+    }
+    /* 右栏变抽屉后不再占据常驻宽度，引用它的终端定位也要归零 */
+    :root {
+        --rail-w: 0px;
+    }
+    .rail-toggle {
+        display: flex;
+    }
+    .app-rail {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(320px, 84vw);
+        padding: 16px 14px;
+        background: var(--bg-primary);
+        border-left: 1px solid var(--border-color);
+        box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+        z-index: 10001;
+        overflow-y: auto;
+    }
+    .app-shell.rail-open .app-rail {
+        transform: translateX(0);
+    }
+    /* 抽屉打开时给一层可点击的遮罩，点它关闭 */
+    .app-shell.rail-open::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        z-index: 10000;
+    }
 }

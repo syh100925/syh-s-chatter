@@ -17,17 +17,9 @@
     {% include '_icons.html' %}
     <div class="background" style="display:none;"></div>
 
-    <!-- 主题切换 -->
-    <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
-        <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
-    </button>
-
-    <!-- 外观 & 工具按钮 -->
-    <div class="appearance-btn" id="appearanceBtn" title="外观设置"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></div>
-    <div class="tools-btn" id="toolsBtn" title="工具集"><svg class="icon" aria-hidden="true"><use href="#i-tool"/></svg></div>
-    {% if 'admin.panel' in permissions %}
-    <div class="admin-entry-btn" id="adminEntryBtn" title="管理面板"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></div>
-    {% endif %}
+    <!-- 主题 / 外观 / 工具 / 管理 四个入口已收进右侧 .app-rail（见下方
+         app-shell 内），此处不再保留一份 body 直属的 fixed 悬浮版本 ——
+         两份并存会在右下角出现重复按钮。 -->
 
     <!-- 工具弹窗 -->
     <div class="tools-modal" id="toolsModal">
@@ -93,6 +85,15 @@
         <button type="button" data-action="unmute" id="avatarUnmuteBtn"><svg class="icon" aria-hidden="true"><use href="#i-volume-2"/></svg> 解除禁言</button>
     </div>
 
+    <!-- 窄屏唤出右栏抽屉的按钮（宽屏由 media query 隐藏） -->
+    <button class="rail-toggle" id="railToggle" aria-label="打开侧栏" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-tool"/></svg></button>
+
+    <!-- 应用外壳：左对话 + 右 app-rail 的两栏 grid。
+         工具/主题/管理入口与快捷指令原先都是 body 下的 position:fixed 悬浮层
+         （z-index 500~9999），彼此靠 right/bottom 硬编码坐标错开、永远压着内容，
+         终端面板还会直接盖住消息。现由同一个 grid 统一管理。 -->
+    <div class="app-shell">
+
     <!-- ========== 主聊天区域 ========== -->
     <!-- 原先这里还有一行 P.boot-line（"… boot complete"），和标题行重复报了两次
          站点名，且它比标题更小、视觉上更弱。已并入 .chat-header，不再单列。 -->
@@ -154,17 +155,37 @@
         </div>
     </div>
 
-    <!-- 快捷指令（聊天窗口右侧列表） -->
-    {% if 'admin.panel' in permissions %}
-    <aside class="cmd-sidebar" id="cmdSidebar">
-        <p>快捷指令</p>
-        <div class="command-buttons">
-            {% if 'chat.clear' in permissions %}<button class="cmd-btn" data-cmd="clear">clear</button>{% endif %}
-            {% if 'chat.change_color' in permissions %}<button class="cmd-btn" data-cmd="change_color [用户名] [颜色]">change_color</button><button class="cmd-btn" data-cmd="change_color 梨岚 #ff0000">梨岚红色</button><button class="cmd-btn" data-cmd="change_color 梨岚 #00ff00">梨岚绿色</button>{% endif %}
-            {% if 'chat.delete' in permissions %}<button class="cmd-btn" data-cmd="delete [数量]">delete</button><button class="cmd-btn" data-cmd="delete 1">delete 1</button><button class="cmd-btn" data-cmd="delete 5">delete 5</button>{% endif %}
+    <!-- 右栏：工作区入口 + 快捷指令。收编原先散落在 body 下的 4 个 fixed 悬浮按钮
+         与 .cmd-sidebar。JS 侧只用 getElementById + addEventListener，不依赖
+         它们的屏幕坐标，故从 fixed 迁到常规流是安全的。 -->
+    <aside class="app-rail" id="appRail">
+        <div class="rail-block">
+            <p class="rail-h">workspace</p>
+            <div class="rail-actions">
+                <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+                    <span class="mode-text" id="modeIndicator">暗</span> <span>主题</span>
+                </button>
+                <div class="appearance-btn" id="appearanceBtn" title="外观设置" role="button" tabindex="0"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg></div>
+                <div class="tools-btn" id="toolsBtn" title="工具集" role="button" tabindex="0"><svg class="icon" aria-hidden="true"><use href="#i-tool"/></svg></div>
+                {% if 'admin.panel' in permissions %}
+                <div class="admin-entry-btn" id="adminEntryBtn" title="管理面板" role="button" tabindex="0"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></div>
+                {% endif %}
+            </div>
         </div>
+        {% if 'admin.panel' in permissions %}
+        <div class="rail-block rail-block-grow" id="cmdRailBlock">
+            <aside class="cmd-sidebar" id="cmdSidebar">
+                <p>快捷指令</p>
+                <div class="command-buttons">
+                    {% if 'chat.clear' in permissions %}<button class="cmd-btn" data-cmd="clear">clear</button>{% endif %}
+                    {% if 'chat.change_color' in permissions %}<button class="cmd-btn" data-cmd="change_color [用户名] [颜色]">change_color</button><button class="cmd-btn" data-cmd="change_color 梨岚 #ff0000">梨岚红色</button><button class="cmd-btn" data-cmd="change_color 梨岚 #00ff00">梨岚绿色</button>{% endif %}
+                    {% if 'chat.delete' in permissions %}<button class="cmd-btn" data-cmd="delete [数量]">delete</button><button class="cmd-btn" data-cmd="delete 1">delete 1</button><button class="cmd-btn" data-cmd="delete 5">delete 5</button>{% endif %}
+                </div>
+            </aside>
+        </div>
+        {% endif %}
     </aside>
-    {% endif %}
+    </div><!-- /.app-shell -->
 
     <!-- 终端反馈区（快捷指令左侧，发送消息时滑出，超时自动缩回；可拖动/隐藏，位置与显隐记忆在 localStorage） -->
     <aside class="cmd-terminal" id="cmdTerminal" aria-hidden="true">

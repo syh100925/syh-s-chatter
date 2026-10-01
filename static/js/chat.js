@@ -1419,6 +1419,35 @@ function loadHtml2Canvas() {
             let termTimer = null;
             let termDragged = false;
 
+            // ---- 窄屏右栏抽屉 ----
+            // 宽屏（>1180px）右栏常驻、.rail-toggle 被 CSS 隐藏；
+            // 窄屏右栏是 off-canvas，由这个开关控制 .app-shell.rail-open。
+            const railToggle = document.getElementById('railToggle');
+            const appShell = document.querySelector('.app-shell');
+            if (railToggle && appShell) {
+                const setRail = function (open) {
+                    appShell.classList.toggle('rail-open', open);
+                    railToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                };
+                railToggle.addEventListener('click', function () {
+                    setRail(!appShell.classList.contains('rail-open'));
+                });
+                // 点遮罩关闭：.rail-open 时 ::after 就是那层遮罩
+                appShell.addEventListener('click', function (e) {
+                    if (!appShell.classList.contains('rail-open')) return;
+                    // 命中 appShell 自身 = 点在遮罩上（::after 不产生事件目标，
+                    // 事件会落到它下面的 appShell），点在 rail 内则不关
+                    if (e.target === appShell) setRail(false);
+                });
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape') setRail(false);
+                });
+                // 视口拉宽到常驻两栏时，清掉抽屉状态，免得下次变窄时残留打开
+                window.addEventListener('resize', function () {
+                    if (window.innerWidth > 1180) setRail(false);
+                });
+            }
+
             function termTime() {
                 const d = new Date();
                 const p = function (n) { return (n < 10 ? '0' : '') + n; };
@@ -1449,6 +1478,26 @@ function loadHtml2Canvas() {
                     termPanel.style.left = pos.left + 'px';
                     termPanel.style.top = pos.top + 'px';
                 } catch (e) {}
+            }
+
+            // 未被拖动过时，终端默认贴在「对话列右缘 + 16px」处。
+            // 不能靠 CSS 的 right 算：.app-shell 是居中的，右侧留白随视口宽度
+            // 变化（1440px 下约 81px、1920px 下约 321px），任何固定 right 值
+            // 都只会在某一个宽度上对。这里直接量实际几何，并随 resize 重算。
+            // 用独立的 term-auto 类而不是复用 .dragged —— .dragged 会连带关掉
+            // 滑入动画，而这里只是要接管 left/top 定位。
+            function termPlaceDefault() {
+                if (!termPanel || termDragged) return;
+                const shell = document.querySelector('.app-shell');
+                if (!shell) return;
+                const wide = window.innerWidth > 1180;   // 窄屏右栏是抽屉，不占宽
+                const chatEl = document.getElementById('chat');
+                const anchor = (wide && chatEl ? chatEl : shell).getBoundingClientRect();
+                const w = termPanel.offsetWidth || 340;
+                const h = termPanel.offsetHeight || 200;
+                termPanel.classList.add('term-auto');
+                termPanel.style.left = Math.max(8, Math.round(anchor.right - w - 16)) + 'px';
+                termPanel.style.top = Math.max(8, Math.round(anchor.top + anchor.height / 2 - h / 2)) + 'px';
             }
 
             function termSavePos() {
@@ -1578,6 +1627,12 @@ function loadHtml2Canvas() {
                     });
                 }
                 termLoadPos();
+                // 没拖过就按实际几何自动摆位；用户拖过则 termLoadPos 已置
+                // termDragged，这里会直接返回，不覆盖用户的位置
+                termPlaceDefault();
+                if (!termDragged) {
+                    window.addEventListener('resize', termPlaceDefault);
+                }
                 termSyncShowBtn();
             }
             const sessionAlert = document.getElementById('sessionAlert');
