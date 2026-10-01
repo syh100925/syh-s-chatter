@@ -723,7 +723,8 @@
         .auth-stage.is-fail .auth-tile.frontier {
             box-shadow: inset 0 0 0 1px #ffffff;
         }
-        /* 行列标号：与格子底色反色，保证初始前景色与绿/红状态下都清晰 */
+        /* 行列标号：与格子底色反色，保证初始前景色与绿/红状态下都清晰。
+           字号由 JS 按实际格宽内联设置（这里只给兜底值） */
         .auth-tile-label {
             position: absolute;
             inset: 0;
@@ -1122,14 +1123,17 @@
                 gap: 4,          // 格子间隙，与 --auth-tile-gap 保持一致
                 tileIn: 280,     // 单格淡入
                 tileOut: 240,    // 单格消失
-                stepIn: 6,       // 每层对角线的错峰
-                stepOut: 5,
+                // 每层对角线的错峰。取值决定「依次出现」是否看得见：
+                // 对角层数约 = max(rows,cols)，错峰过小（如 5ms）整场铺满不到
+                // 100ms，肉眼只会看到所有格子同时出现。
+                stepIn: 30,
+                stepOut: 18,
                 frame: 450,      // 长方形缩放展开
                 fade: 240,       // 舞台淡入
                 color: 300,      // 结果换色
                 split: 500,      // 状态条拉开
                 morph: 450,      // 终态过渡
-                minRun: 1000,    // 结果回来后至少停留这么久再变色，避免一闪而过
+                minRun: 1150,    // 结果回来后至少停留这么久再变色
                 // 状态条拉到位后的停留：失败时结果页会盖住舞台，若不留停留时间，
                 // 「拉到位」这一帧还没被看到就被 ACCESS DENIED / LOCKED 盖掉
                 dwellFail: 900,
@@ -1242,18 +1246,24 @@
                 var cols = Math.max(1, Math.round((frameW + T.gap) / (T.cell + T.gap)));
                 var rows = Math.max(1, Math.round((frameH + T.gap) / (T.cell + T.gap)));
                 tileDiagSpan = Math.max(rows - 1, cols - 1) + 1;
+                // 标号字号按实际格宽收窄：格子有 overflow:hidden，字号固定时
+                // 「R11·C11」在窄格子里会被裁掉，等于没有编号
+                var cellW = (frameW - (cols - 1) * T.gap) / cols;
+                var labelFs = Math.max(4.5, Math.min(9, cellW / 4.4)).toFixed(2);
                 var html = '';
 
                 for (var r = 0; r < rows; r++) {
                     for (var c = 0; c < cols; c++) {
-                        // 到右上角的切比雪夫距离：diag=0 即右上角那一格
-                        var diag = Math.max(r, cols - 1 - c);
+                        // 到左上角的切比雪夫距离：diag=0 即左上角那一格
+                        var diag = Math.max(r, c);
                         var dIn = diag * T.stepIn;
                         var dOut = diag * T.stepOut;
+                        var label = 'R' + (r + 1) + '·C' + (c + 1);
                         html += '<div class="auth-tile" data-diag="' + diag
                             + '" style="transition-delay:'
                             + dIn + 'ms,' + dIn + 'ms,' + dOut + 'ms">'
-                            + '<span class="auth-tile-label">R' + (r + 1) + '·C' + (c + 1) + '</span>'
+                            + '<span class="auth-tile-label" title="' + label
+                            + '" style="font-size:' + labelFs + 'px">' + label + '</span>'
                             + '</div>';
                     }
                 }
@@ -1404,6 +1414,10 @@
                 hideFormArea();
                 void stage.offsetWidth;   // 强制回流，让缩放过渡从 0 起播
                 buildTiles();
+                // 关键：插入格子后必须再回流一次，把 opacity:0 的初始态刷出来。
+                // 否则「建格子」与「加 is-filling」落在同一帧，浏览器首次样式计算
+                // 就已是 opacity:1，过渡不会发生——表现为所有格子同时出现。
+                void tilesBox.offsetWidth;
                 stage.classList.add('is-filling');
                 liveRegion.textContent = '正在验证';
                 setHudStage('load', 1);
