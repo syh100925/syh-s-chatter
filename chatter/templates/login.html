@@ -321,7 +321,14 @@
 
         /* ========== Retry 按钮（登录失败后停在 ACCESS DENIED 状态框里） ========== */
         .auth-retry {
-            margin-top: 1.6rem;
+            /* 绝对定位到状态文字正下方，不占用流内空间。
+               用 left/right:0 + flex 居中而非 translateX，
+               因为出现动画 retryIn 要独占 transform。 */
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 100%;
+            margin-top: 26px;
             display: flex;
             justify-content: center;
             /* 未出现时不占位也不接收点击；visibility 过渡期间同样不接收 */
@@ -819,7 +826,6 @@
             overflow: hidden;
             background: var(--bg-primary);
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             transform: translateX(-50%);
@@ -833,6 +839,16 @@
         .auth-stage.is-leaving .auth-center {
             opacity: 0;
             transition: opacity 0.25s ease;
+        }
+        /* 状态文字的定位层。Retry 绝对定位在它下方（top:100%），因此状态文字
+           始终是本层唯一的流内子元素 —— Retry 出现/消失都不会改变它的
+           大小与位置（若让两者都参与 column flex 的居中，Retry 一出现就会
+           把文字顶上去）。 */
+        .auth-center-stack {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .auth-center-text {
             white-space: nowrap;
@@ -1049,10 +1065,12 @@
                     <div class="auth-bar auth-bar-l" id="authBarL"></div>
                     <div class="auth-bar auth-bar-r" id="authBarR"></div>
                     <div class="auth-center" id="authCenter">
-                        <span class="auth-center-text" id="authCenterText"></span>
-                        <!-- 失败后停在状态框里，下方给出重试入口 -->
-                        <div class="auth-retry" id="authRetry">
-                            <button type="button" class="retry-btn" id="retryBtn">Retry</button>
+                        <div class="auth-center-stack" id="authCenterStack">
+                            <span class="auth-center-text" id="authCenterText"></span>
+                            <!-- 失败后停在状态框里，下方给出重试入口 -->
+                            <div class="auth-retry" id="authRetry">
+                                <button type="button" class="retry-btn" id="retryBtn">Retry</button>
+                            </div>
                         </div>
                     </div>
                 </div>
