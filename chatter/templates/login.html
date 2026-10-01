@@ -1508,6 +1508,18 @@
                     if (withMorph) {
                         html = html.replace('</body>', buildMorphInject(url) + '</body>');
                     }
+                    // 关键：document.open() 会立刻清空当前文档，而新文档的
+                    // body 背景是靠 chat.css 里的 body{background:var(--bg-primary)}
+                    // 上色的。在那份样式表下载并生效之前，页面画布是浏览器默认的
+                    // 白色 —— 深色主题下就是「闪一下白屏」。
+                    // 这里把当前主题的 --bg-primary 作为内联关键样式插到 <head>
+                    // 最前面：内联样式不依赖任何外部请求，解析到就能上色，
+                    // 之后 chat.css 生效时值相同，不会再产生第二次跳变。
+                    var bg = getComputedStyle(document.body)
+                        .getPropertyValue('--bg-primary').trim() || '#1a1a1a';
+                    html = html.replace(/<head>/i,
+                        '<head><style>html{background:' + bg + '}'
+                        + 'body{background:' + bg + '}</style>');
 
                     var reduced = reducedMotion;
                     var delay = reduced ? 0 : 180;
