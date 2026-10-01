@@ -47,10 +47,11 @@ def main():
         assert r.status_code == 200 and b'login' in r.data.lower(), '应返回登录页'
         assert b"cursor:url('/static/cur-default.png')" in r.data, \
             '聊天室页面应注入自定义鼠标指针'
-        # 登录页应内嵌 fetch 登录 + 就地错误提示（不再依赖跳 /error）
-        assert b'id="loginError"' in r.data and b'id="brandWords"' in r.data, \
-            '登录页应包含就地错误提示与品牌词节点'
-        assert b'LOCKED' in r.data, '登录页应复用 LOCKED 故障动画'
+        # 登录页应内嵌 fetch 登录 + Retry 重试入口（不再依赖跳 /error）
+        assert b'id="brandWords"' in r.data, '登录页应保留品牌词'
+        assert b'id="retryBtn"' in r.data, '登录页应提供 Retry 按钮'
+        assert b'LOCKED' not in r.data, '登录页不应再有 LOCKED 大字'
+        assert b'error-animation-text' not in r.data, '登录页不应再有 LOCKED 故障动画样式'
         assert b'/login' in r.data, '登录页脚本应指向 /login 接口'
 
         # 4. 注册新用户

@@ -210,32 +210,6 @@
             }
         }
 
-        /* 登录失败态：品牌词切换为 DENIED / BLOCKED 故障动画 */
-        .dynamic-word.is-error {
-            min-width: 90px;
-            color: var(--error-glow-1);
-        }
-        .dynamic-word.is-error span {
-            animation: errorWordCycle 3s infinite;
-        }
-        @keyframes errorWordCycle {
-            0%,
-            30% {
-                opacity: 0;
-                transform: translateY(4px);
-            }
-            35%,
-            65% {
-                opacity: 1;
-                transform: translateY(0);
-            }
-            70%,
-            100% {
-                opacity: 0;
-                transform: translateY(-4px);
-            }
-        }
-
         /* ========== 标题区 ========== */
         .login-title {
             margin-bottom: 3rem;
@@ -345,106 +319,128 @@
             transform: none;
         }
 
-        /* ========== 登录失败覆盖层（复用 login_error 的 LOCKED 故障动画） ========== */
-        .login-error {
-            position: absolute;
-            inset: 0;
+        /* ========== Retry 按钮（登录失败后停在 ACCESS DENIED 状态框里） ========== */
+        .auth-retry {
+            margin-top: 1.6rem;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
-            gap: 0.5rem;
-            background: var(--bg-primary);
-            opacity: 0;
+            /* 未出现时不占位也不接收点击；visibility 过渡期间同样不接收 */
             visibility: hidden;
-            /* 未激活时必须完全不接收指针事件：visibility 的淡出过渡期间元素
-               仍按 visible 处理，若不禁用会在 0.3s 内吞掉用户的重试点击 */
             pointer-events: none;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
         }
-        .login-error.active {
-            opacity: 1;
+        .auth-retry.active {
             visibility: visible;
             pointer-events: auto;
         }
-        .error-animation-text {
-            font-size: 3.5rem;
-            font-weight: 500;
-            letter-spacing: 8px;
-            color: var(--error-glow-1);
-            text-transform: uppercase;
-            animation: errorTextFlicker 2.5s infinite;
-            line-height: 1.2;
-        }
-        @keyframes errorTextFlicker {
-            0%,
-            19%,
-            21%,
-            23%,
-            25%,
-            54%,
-            56%,
-            100% {
-                opacity: 1;
-                color: var(--error-glow-1);
-            }
-            20%,
-            24%,
-            55% {
-                opacity: 0.4;
-                color: var(--error-glow-2);
-            }
-        }
-        .error-message {
-            color: var(--fg-secondary);
-            font-size: 1rem;
-            letter-spacing: 1px;
-            text-align: center;
-        }
-        .error-message .highlight {
+        .retry-btn {
+            position: relative;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background: transparent;
+            border: 1px solid var(--error-color);
             color: var(--error-color);
-            font-weight: 500;
-            letter-spacing: 2px;
-            animation: highlightPulse 2s infinite;
+            padding: 10px 26px;
+            min-width: 132px;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 0;
+            /* 出现动画与循环脉冲串联：先入场，再持续呼吸提示 */
+            animation: none;
+            transition: background-color 0.2s ease, color 0.2s ease,
+                transform 0.2s ease, border-color 0.2s ease;
         }
-        @keyframes highlightPulse {
-            0%,
-            100% {
-                opacity: 0.85;
+        .auth-retry.active .retry-btn {
+            animation: retryIn 0.45s ease both,
+                retryPulse 1.9s ease 0.45s infinite alternate;
+        }
+        /* 出现：淡入 + 上滑 + 微缩放。
+           to 刻意不写 transform：fill-mode:both 会让 to 的值长期生效，
+           从而压过 :hover 的 transform（动画在层叠中优先于普通声明）。 */
+        @keyframes retryIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.96);
             }
-            50% {
+            to {
                 opacity: 1;
             }
         }
-        .error-hint {
-            margin-top: 1rem;
-            font-size: 0.7rem;
-            color: var(--fg-muted);
+        /* 重复：光晕与边框轻微起伏的呼吸脉冲 */
+        @keyframes retryPulse {
+            from {
+                box-shadow: 0 0 0 0 rgba(255, 107, 107, 0);
+                border-color: var(--error-color);
+            }
+            to {
+                box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.14);
+                border-color: var(--error-glow-1);
+            }
+        }
+        /* 选择器需与 .auth-retry.active .retry-btn 同级或更高：
+           上面的 animation 简写会把 animation-play-state 重置为 running */
+        .auth-retry.active .retry-btn:hover {
+            background: var(--error-color);
+            color: var(--bg-primary);
+            transform: translateY(-2px);
+            /* 悬停时冻住呼吸脉冲，避免与悬停效果叠加抖动 */
+            animation-play-state: paused;
+        }
+        .auth-retry.active .retry-btn:active {
+            transform: translateY(0);
+        }
+        .retry-btn:focus-visible {
+            outline: 1px solid var(--fg-primary);
+            outline-offset: 3px;
+        }
+        body.light-theme .retry-btn:hover {
+            color: var(--bg-primary);
+        }
+
+        /* reduced-motion 降级路径：表单区的一行文字 + Retry（不进 HUD 舞台） */
+        .inline-fail {
+            margin-top: 1.2rem;
+            visibility: hidden;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .inline-fail.active {
+            visibility: visible;
+            pointer-events: auto;
+            opacity: 1;
+        }
+        .inline-fail-msg {
+            color: var(--error-color);
+            font-size: 0.75rem;
             letter-spacing: 2px;
+            margin-bottom: 0.8rem;
+        }
+        .inline-fail-btn {
+            appearance: none;
+            -webkit-appearance: none;
+            background: transparent;
+            border: 1px solid var(--error-color);
+            color: var(--error-color);
+            padding: 8px 22px;
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            letter-spacing: 4px;
             text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 0;
+            transition: background-color 0.2s ease, color 0.2s ease,
+                transform 0.2s ease;
         }
-        /* 失败时表单整体轻微抖动 */
-        @keyframes errorShake {
-            0%,
-            100% {
-                transform: translateX(0);
-            }
-            20% {
-                transform: translateX(-6px);
-            }
-            40% {
-                transform: translateX(5px);
-            }
-            60% {
-                transform: translateX(-3px);
-            }
-            80% {
-                transform: translateX(2px);
-            }
+        .inline-fail-btn:hover {
+            background: var(--error-color);
+            color: var(--bg-primary);
+            transform: translateY(-2px);
         }
-        .login-error.active ~ .login-form-area {
-            animation: errorShake 0.4s ease;
-        }
+
         /* 换档遮罩：淡出到背景色，遮住 document.write 重解析产生的白闪 */
         .nav-fade {
             position: fixed;
@@ -459,12 +455,15 @@
             opacity: 1;
         }
         @media (prefers-reduced-motion: reduce) {
-            .login-error,
             .nav-fade {
                 transition: none;
             }
-            .login-error.active ~ .login-form-area {
+            .auth-retry.active .retry-btn {
                 animation: none;
+            }
+            .retry-btn {
+                transition: background-color 0.2s ease, color 0.2s ease,
+                    transform 0.2s ease, border-color 0.2s ease;
             }
         }
 
@@ -820,6 +819,7 @@
             overflow: hidden;
             background: var(--bg-primary);
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             transform: translateX(-50%);
@@ -910,13 +910,6 @@
                 min-width: 60px;
                 font-size: 0.7rem;
             }
-            .dynamic-word.is-error {
-                min-width: 78px;
-            }
-            .error-animation-text {
-                font-size: 2.6rem;
-                letter-spacing: 5px;
-            }
         }
     </style>
 </head>
@@ -1005,6 +998,12 @@
                 <button type="submit" id="loginSubmit">// 进入 //</button>
             </form>
 
+            <!-- reduced-motion 降级路径的失败提示（正常动画路径不显示） -->
+            <div class="inline-fail" id="inlineFail">
+                <div class="inline-fail-msg" id="inlineFailText"></div>
+                <button type="button" class="inline-fail-btn" id="inlineRetryBtn">Retry</button>
+            </div>
+
             <!-- 底部装饰 -->
             <div class="footer-note">
                 <span>end-to-end</span>
@@ -1022,15 +1021,6 @@
                     <div style="color: var(--fg-secondary); margin-bottom: 1rem;">注册成功，请登录</div>
                 {% endif %}
             </div>
-        </div>
-
-        <!-- 登录失败就地提示（取代跳转到 /error 页） -->
-        <div class="login-error" id="loginError" role="alert" aria-live="assertive">
-            <div class="error-animation-text">LOCKED</div>
-            <div class="error-message">
-                <span class="highlight" id="loginErrorTitle">密码错误</span>，请重新登录。
-            </div>
-            <div class="error-hint" id="loginErrorHint">如果忘记了密码，请联系管理员</div>
         </div>
     </div>
 
@@ -1060,6 +1050,10 @@
                     <div class="auth-bar auth-bar-r" id="authBarR"></div>
                     <div class="auth-center" id="authCenter">
                         <span class="auth-center-text" id="authCenterText"></span>
+                        <!-- 失败后停在状态框里，下方给出重试入口 -->
+                        <div class="auth-retry" id="authRetry">
+                            <button type="button" class="retry-btn" id="retryBtn">Retry</button>
+                        </div>
                     </div>
                 </div>
                 <div class="auth-hud-side" id="authSide">
@@ -1099,16 +1093,16 @@
             var submitBtn = document.getElementById('loginSubmit');
             var usernameInput = document.getElementById('username');
             var passwordInput = document.getElementById('password');
-            var errorBox = document.getElementById('loginError');
-            var errorTitle = document.getElementById('loginErrorTitle');
-            var errorHint = document.getElementById('loginErrorHint');
-            var brandWords = document.getElementById('brandWords');
             var DEFAULT_SUBMIT_TEXT = submitBtn.textContent;
 
             var stage = document.getElementById('authStage');
             var tilesBox = document.getElementById('authTiles');
             var centerText = document.getElementById('authCenterText');
             var liveRegion = document.getElementById('authLive');
+            var retryRow = document.getElementById('authRetry');
+            var retryBtn = document.getElementById('retryBtn');
+            var inlineFailBox = document.getElementById('inlineFail');
+            var inlineFailText = document.getElementById('inlineFailText');
             var hudStage = document.getElementById('authHudStage');
             var hudClock = document.getElementById('authHudClock');
             var hudCount = document.getElementById('authHudCount');
@@ -1118,10 +1112,6 @@
             var sideItems = document.getElementById('authSide')
                 ? document.getElementById('authSide').querySelectorAll('.auth-hud-item')
                 : [];
-
-            // 正常品牌词与故障品牌词（失败时整体切换，与 login_error.html 视觉一致）
-            var NORMAL_WORDS = ['SECURE', 'ENCRYPT'];
-            var ERROR_WORDS = ['DENIED', 'BLOCKED'];
 
             // ---- 动画时序（毫秒）----
             var T = {
@@ -1139,14 +1129,14 @@
                 color: 300,      // 结果换色
                 split: 500,      // 状态条拉开
                 morph: 450,      // 终态过渡
-                minRun: 1150,    // 点击后至少这么久才允许变色
+                // 请求排在铺开动画之后，因此铺满到变色的间隔只需一个很小的值
+                gapFill: 120,
                 // 变色完成之后再停留这么久才开始消格。位置很关键：要停在
                 // 「红/绿已铺满」这个状态上留出可读的静止时间，而不是停在
                 // 变色之前（那样只是白等，且看不到状态色）。
                 holdPause: 1000,
-                // 状态条拉到位后的停留：失败时结果页会盖住舞台，若不留停留时间，
-                // 「拉到位」这一帧还没被看到就被 ACCESS DENIED / LOCKED 盖掉
-                dwellFail: 900,
+                // 失败终态：竖条落定后停一下，随后在状态框下方弹出 Retry
+                dwellFail: 400,
                 dwellOk: 380
             };
 
@@ -1298,27 +1288,6 @@
                 tilesBuilt = true;
             }
 
-            function setBrandWords(words, isError) {
-                var spans = brandWords.querySelectorAll('span');
-                for (var i = 0; i < spans.length; i++) {
-                    // 仅写入固定常量，不拼接任何服务端数据
-                    spans[i].textContent = words[i] || '';
-                }
-                brandWords.classList.toggle('is-error', !!isError);
-            }
-
-            function showError(title, hint) {
-                errorTitle.textContent = title;
-                errorHint.textContent = hint;
-                setBrandWords(ERROR_WORDS, true);
-                errorBox.classList.add('active');
-            }
-
-            function clearError() {
-                errorBox.classList.remove('active');
-                setBrandWords(NORMAL_WORDS, false);
-            }
-
             function setSubmitting(flag) {
                 submitting = flag;
                 submitBtn.disabled = flag;
@@ -1347,6 +1316,37 @@
                     el.style.opacity = '';
                     el.style.transform = '';
                 });
+            }
+
+            // 把舞台整个复位到未开始的状态（Retry 后重新走一遍动画）
+            function resetStage() {
+                stage.classList.remove('active', 'is-split', 'is-filling', 'is-clearing',
+                    'is-ok', 'is-fail', 'is-leaving');
+                retryRow.classList.remove('active');
+                tilesBuilt = false;
+                tileGroups = [];
+                tilesBox.innerHTML = '';
+                centerText.textContent = '';
+                stopClock();
+                setHudStage('boot', 0);
+                setHudProgress(0, 0);
+                setHudPrompt('> _');
+                hudClock.textContent = '00:00.0';
+                liveRegion.textContent = '';
+            }
+
+            // 失败终态：在 ACCESS DENIED 状态框下方弹出 Retry
+            function showRetry() {
+                retryRow.classList.add('active');
+                liveRegion.textContent = '验证失败，可以重试';
+                if (retryBtn) retryBtn.focus();
+            }
+
+            // reduced-motion 降级路径：不进 HUD 舞台，改在表单区显示一行文字 + Retry
+            function inlineFail(message) {
+                if (!inlineFailBox) return;
+                inlineFailText.textContent = message;
+                inlineFailBox.classList.add('active');
             }
 
             // 换档时注入：把长方形终态精确落到真实 #chat 的矩形上。
@@ -1457,8 +1457,9 @@
             }
 
             // 阶段 B~E：结果 → 消格 → 状态条拉开 → 终态
-            // started 为点击时刻；即使结果早已回来也至少展示 minRun 再变色。
-            function playAttempt(result, started) {
+            // 阶段 B~E：结果 → 消格 → 状态条拉开 → 终态。
+            // 请求已在铺开动画播完后发出，故此处只需 gapFill 的小间隔。
+            function playAttempt(result) {
                 var ok = result.kind === 'ok';
 
                 function doneA() {
@@ -1502,34 +1503,19 @@
                             );
                         });
                     }
-                    // 失败：状态条淡出，还原表单并弹出 LOCKED
-                    stage.classList.remove('active');
-                    stage.classList.remove('is-split', 'is-filling', 'is-clearing',
-                        'is-ok', 'is-fail', 'is-leaving');
-                    tilesBuilt = false;
-                    tileGroups = [];
-                    tilesBox.innerHTML = '';
-                    restoreFormArea();
+                    // 失败终态：舞台原地定格在 ACCESS DENIED 状态框上，不拆台、
+                    // 不弹旧故障页、也不还原表单（表单保持隐藏），只在状态框下方
+                    // 弹出 Retry。
+                    setHudStage('denied', 5);
+                    setHudPrompt(result.kind === 'net' ? 'retry' : 'locked · retry');
                     setSubmitting(false);
-                    setHudStage('boot', 0);
-                    setHudProgress(0, 0);
-                    if (result.kind === 'net') {
-                        showError('连接失败', '无法连接到服务器，请检查网络');
-                    } else {
-                        showError('密码错误', '如果忘记了密码，请联系管理员');
-                    }
                     passwordInput.value = '';
-                    passwordInput.focus();
+                    showRetry();
                 }
 
-                // 变色不得早于：点击 + minRun，或铺满那一刻（取较晚者）。
-                // 真正的「停留」在 doneA 之后单独一段（holdPause）。
-                var colorNotBefore = Math.max(
-                    started + T.minRun,
-                    fillStartAt + fillSpanMs
-                );
-
-                return wait(Math.max(0, colorNotBefore - Date.now()))
+                // 请求本身排在铺开动画之后（见 submit 处理），所以结果回来时铺满
+                // 早已结束；这里只需一个很小的间隔，再变色。
+                return wait(T.gapFill)
                     .then(doneA)                       // 变色，并等颜色过渡走完
                     .then(function () {                // 变色完成后停留片刻
                         return wait(T.holdPause);
@@ -1539,25 +1525,9 @@
                     .then(stageE);
             }
 
-            form.addEventListener('submit', function (event) {
-                // JS 可用时走 fetch；脚本未加载/被禁用时表单仍可原生 POST 到
-                // /chatts，由服务端按原逻辑 302 到 /error 兜底。
-                if (typeof window.fetch !== 'function') return;
-                event.preventDefault();
-                if (submitting) return;
-
-                var username = (usernameInput.value || '').trim();
-                var password = passwordInput.value || '';
-                if (!username || !password) return;
-
-                clearError();
-                setSubmitting(true);
-                var started = Date.now();
-
-                // 动画与请求并行：点击即刻铺格子，服务器慢时界面也有反馈
-                if (!reducedMotion) beginFill();
-
-                var loginPromise = fetch(BASE_PATH + '/login', {
+            // 发送登录请求（统一出口，供动画路径与 reduced-motion 降级路径复用）
+            function sendLogin(username, password) {
+                return fetch(BASE_PATH + '/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: username, password: password })
@@ -1575,10 +1545,25 @@
                 }).catch(function () {
                     return { kind: 'net' };
                 });
+            }
+
+            form.addEventListener('submit', function (event) {
+                // JS 可用时走 fetch；脚本未加载/被禁用时表单仍可原生 POST 到
+                // /chatts，由服务端按原逻辑 302 到 /error 兜底。
+                if (typeof window.fetch !== 'function') return;
+                event.preventDefault();
+                if (submitting) return;
+
+                var username = (usernameInput.value || '').trim();
+                var password = passwordInput.value || '';
+                if (!username || !password) return;
+
+                resetStage();
+                setSubmitting(true);
 
                 if (reducedMotion) {
-                    // 降级：不放动画，直接按结果换档或就地报错
-                    loginPromise.then(function (result) {
+                    // 降级：不放动画，立即发请求；失败在表单区给一行文字 + Retry
+                    sendLogin(username, password).then(function (result) {
                         if (result.kind === 'ok') {
                             softNavigate(
                                 BASE_PATH + '/chatts?update=' + encodeURIComponent(result.token), false
@@ -1586,26 +1571,44 @@
                             return;
                         }
                         setSubmitting(false);
-                        if (result.kind === 'net') {
-                            showError('连接失败', '无法连接到服务器，请检查网络');
-                        } else {
-                            showError('密码错误', '如果忘记了密码，请联系管理员');
-                        }
                         passwordInput.value = '';
-                        passwordInput.focus();
+                        inlineFail(result.kind === 'net'
+                            ? '连接失败，请检查网络'
+                            : '密码错误，请重新登录');
                     });
                     return;
                 }
 
-                loginPromise.then(function (result) {
-                    return playAttempt(result, started);
+                // 先把铺开动画播完，再发送请求
+                beginFill();
+                wait(fillSpanMs).then(function () {
+                    return sendLogin(username, password);
+                }).then(function (result) {
+                    return playAttempt(result);
                 });
             });
 
-            // 重新输入时收起故障覆盖层
-            form.addEventListener('input', function () {
-                if (errorBox.classList.contains('active') && !submitting) clearError();
-            });
+            // Retry：还原表单，交回输入；下一次提交会重播整段动画并重发请求
+            if (retryBtn) {
+                retryBtn.addEventListener('click', function () {
+                    if (submitting) return;
+                    resetStage();
+                    restoreFormArea();
+                    setSubmitting(false);
+                    passwordInput.focus();
+                });
+            }
+
+            // reduced-motion 降级路径用的行内提示（不进 HUD 舞台）
+            if (inlineFailBox) {
+                inlineFailBox.addEventListener('click', function (ev) {
+                    if (ev.target && ev.target.id === 'inlineRetryBtn') {
+                        inlineFailBox.classList.remove('active');
+                        setSubmitting(false);
+                        passwordInput.focus();
+                    }
+                });
+            }
         })();
     </script>
 </body>
