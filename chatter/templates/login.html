@@ -481,6 +481,11 @@
             --auth-tile-gap: 4px;
             --auth-bar-w: 1px;
             --auth-bar-h: 96px;
+            /* HUD 框架 */
+            --auth-hud-side-w: 92px;
+            --auth-hud-fg: var(--fg-secondary);
+            --auth-hud-dim: var(--fg-muted);
+            --auth-tile-radius: 2px;
             position: fixed;
             inset: 0;
             z-index: 10001;
@@ -498,7 +503,91 @@
             pointer-events: auto;
         }
 
-        /* 长方型窗口：自中心 ease 缩放展开 */
+        /* HUD 整体：自中心 ease 缩放展开（连同格子、状态列表、进度条一起） */
+        .auth-hud {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transform: scale(0.18);
+            opacity: 0;
+            transition: transform 0.45s ease, opacity 0.45s ease;
+        }
+        .auth-stage.active .auth-hud {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        /* ---- HUD 顶部框架行：[ 标题 | 阶段 | 刻度进度线 | 计时 ] ---- */
+        .auth-hud-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.62rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--auth-hud-dim);
+            white-space: nowrap;
+        }
+        .auth-hud-bracket {
+            color: var(--fg-muted);
+        }
+        .auth-hud-sep {
+            color: var(--border-color);
+        }
+        .auth-hud-stage {
+            color: var(--auth-hud-fg);
+            min-width: 6.5em;
+            transition: color 0.3s ease;
+        }
+        .auth-stage.is-ok .auth-hud-stage {
+            color: var(--ok-color);
+        }
+        .auth-stage.is-fail .auth-hud-stage {
+            color: var(--error-color);
+        }
+        .auth-hud-clock {
+            color: var(--auth-hud-fg);
+            font-variant-numeric: tabular-nums;
+        }
+        /* 刻度进度线：底纹用重复渐变画刻度，填充层随进度推进 */
+        .auth-hud-track {
+            position: relative;
+            flex: 1;
+            height: 6px;
+            min-width: 60px;
+            background: var(--bg-secondary);
+        }
+        .auth-hud-track-fill {
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 0;
+            background: var(--auth-hud-fg);
+            transition: width 0.25s ease, background-color 0.3s ease;
+        }
+        /* 刻度叠在填充之上，避免进度走满后刻度被盖住 */
+        .auth-hud-track::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(90deg,
+                var(--bg-primary) 0 1px, transparent 1px 12px);
+            opacity: 0.65;
+        }
+        .auth-stage.is-ok .auth-hud-track-fill {
+            background: var(--ok-color);
+        }
+        .auth-stage.is-fail .auth-hud-track-fill {
+            background: var(--error-color);
+        }
+
+        /* ---- HUD 主体：长方形 + 右侧状态列表 ---- */
+        .auth-hud-body {
+            display: flex;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        /* 长方型窗口：格子容器 */
         .auth-frame {
             position: relative;
             width: var(--auth-frame-w);
@@ -506,14 +595,7 @@
             background: var(--bg-primary);
             border: 1px solid var(--border-color);
             overflow: hidden;
-            transform: scale(0.18);
-            opacity: 0;
-            transition: transform 0.45s ease, opacity 0.45s ease,
-                border-color 0.3s ease, width 0.45s ease, height 0.45s ease;
-        }
-        .auth-stage.active .auth-frame {
-            transform: scale(1);
-            opacity: 1;
+            transition: border-color 0.3s ease;
         }
         /* 结果态：轮廓染成状态色 */
         .auth-stage.is-ok .auth-frame {
@@ -521,6 +603,77 @@
         }
         .auth-stage.is-fail .auth-frame {
             border-color: var(--error-color);
+        }
+
+        /* ---- HUD 右侧状态列表：逐条点亮 ---- */
+        .auth-hud-side {
+            width: var(--auth-hud-side-w);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 10px;
+            border-left: 1px solid var(--border-color);
+            padding-left: 8px;
+        }
+        .auth-hud-item {
+            font-size: 0.6rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            opacity: 0.4;
+            border-left: 2px solid transparent;
+            padding-left: 6px;
+            transition: color 0.3s ease, opacity 0.3s ease,
+                border-color 0.3s ease;
+        }
+        .auth-hud-item.lit {
+            color: var(--auth-hud-fg);
+            opacity: 1;
+        }
+        .auth-hud-item.active {
+            border-left-color: var(--auth-hud-fg);
+            color: var(--fg-primary);
+        }
+        .auth-stage.is-ok .auth-hud-item.active {
+            border-left-color: var(--ok-color);
+            color: var(--ok-color);
+        }
+        .auth-stage.is-fail .auth-hud-item.active {
+            border-left-color: var(--error-color);
+            color: var(--error-color);
+        }
+
+        /* ---- HUD 底部框架行：计数文本 + 进度条 + 提示 ---- */
+        .auth-hud-count {
+            color: var(--auth-hud-fg);
+            font-variant-numeric: tabular-nums;
+            min-width: 15em;
+        }
+        .auth-progress {
+            position: relative;
+            flex: 1;
+            height: 10px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+        }
+        .auth-progress-fill {
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 0;
+            background: var(--auth-hud-fg);
+            transition: width 0.25s ease, background-color 0.3s ease;
+        }
+        .auth-stage.is-ok .auth-progress-fill {
+            background: var(--ok-color);
+        }
+        .auth-stage.is-fail .auth-progress-fill {
+            background: var(--error-color);
+        }
+        .auth-hud-prompt {
+            color: var(--auth-hud-fg);
+            min-width: 9em;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* 格子层：铺满长方形，随阶段切换显隐；格子之间留出间隙 */
@@ -533,12 +686,13 @@
         .auth-tile {
             position: relative;
             overflow: hidden;
+            border-radius: var(--auth-tile-radius);
             /* 初始前景色：格子一上来就是有存在感的颜色，而不是背景色 */
             background: var(--fg-secondary);
             opacity: 0;
             transform: scale(0.4);
             transition: opacity 0.28s ease, transform 0.28s ease,
-                background-color 0.3s ease;
+                background-color 0.3s ease, box-shadow 0.3s ease;
         }
         /* 装载：格子自右上角对角线扩散铺满 */
         .auth-stage.is-filling .auth-tile {
@@ -549,6 +703,16 @@
         .auth-stage.is-clearing .auth-tile {
             opacity: 0;
             transform: scale(0.3);
+        }
+        /* 对角扩散的前沿带：正在铺开的那一条对角线高亮描边 */
+        .auth-stage.is-filling .auth-tile.frontier {
+            box-shadow: inset 0 0 0 1px var(--fg-primary);
+        }
+        .auth-stage.is-ok .auth-tile.frontier {
+            box-shadow: inset 0 0 0 1px #ffffff;
+        }
+        .auth-stage.is-fail .auth-tile.frontier {
+            box-shadow: inset 0 0 0 1px #ffffff;
         }
         /* 行列标号：与格子底色反色，保证初始前景色与绿/红状态下都清晰 */
         .auth-tile-label {
@@ -607,11 +771,14 @@
         .auth-stage.is-split .auth-bar {
             opacity: 1;
         }
+        /* 两条停在屏幕左右边缘内侧 6px。
+           注意：left:50% 定位的是条的左边，故右条要减去自身宽度与内缩量，
+           否则会停在 vw~vw+1px 处（视口外，完全看不见）。 */
         .auth-stage.is-split .auth-bar-l {
-            transform: translateX(-50vw);
+            transform: translateX(calc(-50vw + 6px));
         }
         .auth-stage.is-split .auth-bar-r {
-            transform: translateX(50vw);
+            transform: translateX(calc(50vw - 6px - var(--auth-bar-w)));
         }
         /* 成功终态：两条竖条继续 ease 移出舞台 */
         .auth-stage.is-leaving .auth-bar-l {
@@ -848,9 +1015,40 @@
 
     <!-- 登录尝试动画舞台：装饰性内容，供读屏的文本见 .auth-live -->
     <div class="auth-stage" id="authStage" aria-hidden="true">
-        <div class="auth-frame" id="authFrame">
-            <div class="auth-tiles" id="authTiles"></div>
+        <div class="auth-hud" id="authHud">
+            <!-- 顶部框架行 -->
+            <div class="auth-hud-row">
+                <span class="auth-hud-bracket">[</span>
+                <span>argv_login·syh-cr</span>
+                <span class="auth-hud-sep">|</span>
+                <span class="auth-hud-stage" id="authHudStage">BOOT</span>
+                <span class="auth-hud-track"><i class="auth-hud-track-fill" id="authTrackFill"></i></span>
+                <span class="auth-hud-clock" id="authHudClock">00:00.0</span>
+                <span class="auth-hud-bracket">]</span>
+            </div>
+
+            <!-- 主体：长方形格子窗口 + 右侧状态列表 -->
+            <div class="auth-hud-body">
+                <div class="auth-frame" id="authFrame">
+                    <div class="auth-tiles" id="authTiles"></div>
+                </div>
+                <div class="auth-hud-side" id="authSide">
+                    <span class="auth-hud-item" data-k="load">load</span>
+                    <span class="auth-hud-item" data-k="verify">verify</span>
+                    <span class="auth-hud-item" data-k="sync">sync</span>
+                    <span class="auth-hud-item" data-k="render">render</span>
+                    <span class="auth-hud-item" data-k="commit">commit</span>
+                </div>
+            </div>
+
+            <!-- 底部框架行：计数 + 进度条 + 提示 -->
+            <div class="auth-hud-row">
+                <span class="auth-hud-count" id="authHudCount">cells 000/000 · 0%</span>
+                <span class="auth-progress"><i class="auth-progress-fill" id="authProgressFill"></i></span>
+                <span class="auth-hud-prompt" id="authHudPrompt">&gt;_</span>
+            </div>
         </div>
+
         <!-- 状态条与中间面板挂在舞台而非长方形上：长方形 overflow:hidden 会裁掉它们，
              导致「向两边拉开」看不见 -->
         <div class="auth-bar auth-bar-l" id="authBarL"></div>
@@ -889,6 +1087,15 @@
             var tilesBox = document.getElementById('authTiles');
             var centerText = document.getElementById('authCenterText');
             var liveRegion = document.getElementById('authLive');
+            var hudStage = document.getElementById('authHudStage');
+            var hudClock = document.getElementById('authHudClock');
+            var hudCount = document.getElementById('authHudCount');
+            var hudPrompt = document.getElementById('authHudPrompt');
+            var trackFill = document.getElementById('authTrackFill');
+            var progressFill = document.getElementById('authProgressFill');
+            var sideItems = document.getElementById('authSide')
+                ? document.getElementById('authSide').querySelectorAll('.auth-hud-item')
+                : [];
 
             // 正常品牌词与故障品牌词（失败时整体切换，与 login_error.html 视觉一致）
             var NORMAL_WORDS = ['SECURE', 'ENCRYPT'];
@@ -907,7 +1114,11 @@
                 color: 300,      // 结果换色
                 split: 500,      // 状态条拉开
                 morph: 450,      // 终态过渡
-                minRun: 1000     // 结果回来后至少停留这么久再变色，避免一闪而过
+                minRun: 1000,    // 结果回来后至少停留这么久再变色，避免一闪而过
+                // 状态条拉到位后的停留：失败时结果页会盖住舞台，若不留停留时间，
+                // 「拉到位」这一帧还没被看到就被 ACCESS DENIED / LOCKED 盖掉
+                dwellFail: 900,
+                dwellOk: 380
             };
 
             var STATUS_TEXT = {
@@ -922,6 +1133,77 @@
             var submitting = false;
             var tilesBuilt = false;
             var tileDiagSpan = 1;   // 对角层数，用于精确推算消格总时长
+            var tileTotal = 0;      // 格子总数，供 HUD 计数
+            var tileGroups = [];    // 按对角层分组的格子，供高亮前沿带
+            var clockIv = null;
+
+            // ---- HUD 辅助 ----
+
+            function pad(n, w) {
+                var s = String(n);
+                while (s.length < w) s = '0' + s;
+                return s;
+            }
+
+            // 顶部阶段词 + 右侧状态列表逐条点亮
+            var STAGES = {
+                boot: 'BOOT',
+                load: 'LOAD',
+                verify: 'VERIFY',
+                commit: 'COMMIT',
+                granted: 'GRANTED',
+                denied: 'DENIED',
+                lost: 'LOST'
+            };
+
+            function setHudStage(name, litCount) {
+                hudStage.textContent = STAGES[name] || String(name).toUpperCase();
+                for (var i = 0; i < sideItems.length; i++) {
+                    var lit = i < litCount;
+                    sideItems[i].classList.toggle('lit', lit);
+                    sideItems[i].classList.toggle('active', i === litCount - 1 && lit);
+                }
+            }
+
+            function setHudProgress(filled, total) {
+                var pct = total ? Math.round(filled / total * 100) : 0;
+                hudCount.textContent = 'cells ' + pad(filled, 3) + '/' + pad(total, 3)
+                    + ' · ' + pct + '%';
+                var w = pct + '%';
+                progressFill.style.width = w;
+                trackFill.style.width = w;
+            }
+
+            function setHudPrompt(text) {
+                hudPrompt.textContent = '> ' + text;
+            }
+
+            function startClock() {
+                var t0 = Date.now();
+                stopClock();
+                clockIv = setInterval(function () {
+                    var s = (Date.now() - t0) / 1000;
+                    hudClock.textContent = '00:' + pad(s < 10 ? '0' + s.toFixed(1) : s.toFixed(1), 4);
+                }, 100);
+            }
+
+            function stopClock() {
+                if (clockIv) { clearInterval(clockIv); clockIv = null; }
+            }
+
+            // 高亮正在铺开的那条对角前沿带
+            function setFrontier(diag) {
+                if (diag < 0 || diag >= tileGroups.length) return;
+                for (var d = 0; d < tileGroups.length; d++) {
+                    var on = (d === diag);
+                    var g = tileGroups[d];
+                    for (var i = 0; i < g.length; i++) {
+                        if (g[i].classList.contains('frontier') !== on) {
+                            g[i].classList.toggle('frontier', on);
+                        }
+                    }
+                }
+            }
 
             function wait(ms) {
                 return new Promise(function (resolve) { setTimeout(resolve, ms); });
@@ -953,7 +1235,8 @@
                         var diag = Math.max(r, cols - 1 - c);
                         var dIn = diag * T.stepIn;
                         var dOut = diag * T.stepOut;
-                        html += '<div class="auth-tile" style="transition-delay:'
+                        html += '<div class="auth-tile" data-diag="' + diag
+                            + '" style="transition-delay:'
                             + dIn + 'ms,' + dIn + 'ms,' + dOut + 'ms">'
                             + '<span class="auth-tile-label">R' + (r + 1) + '·C' + (c + 1) + '</span>'
                             + '</div>';
@@ -963,6 +1246,16 @@
                 tilesBox.style.gridTemplateRows = 'repeat(' + rows + ', 1fr)';
                 tilesBox.style.gap = T.gap + 'px';
                 tilesBox.innerHTML = html;
+                // 按对角层分组，供高亮前沿带
+                tileGroups = [];
+                for (var d = 0; d < tileDiagSpan; d++) tileGroups.push([]);
+                var kids = tilesBox.children;
+                for (var n = 0; n < kids.length; n++) {
+                    var idx = kids[n].getAttribute('data-diag');
+                    tileGroups[parseInt(idx, 10)].push(kids[n]);
+                }
+                tileTotal = cols * rows;
+                setHudProgress(0, tileTotal);
                 tilesBuilt = true;
             }
 
@@ -1098,6 +1391,25 @@
                 buildTiles();
                 stage.classList.add('is-filling');
                 liveRegion.textContent = '正在验证';
+                setHudStage('load', 1);
+                setHudPrompt('load cells');
+                startClock();
+                // 前沿带跟随对角错峰推进，计数与进度条同步
+                var total = tileDiagSpan;
+                var t0 = Date.now();
+                var lastDiag = -1;
+                var iv = setInterval(function () {
+                    if (!stage.classList.contains('active')) { clearInterval(iv); return; }
+                    var diag = Math.min(total - 1,
+                        Math.floor((Date.now() - t0) / T.stepIn));
+                    if (diag === lastDiag) return;
+                    setFrontier(diag);
+                    // 已铺开 = 对角层 0..diag 的格子数
+                    var filled = 0;
+                    for (var d = 0; d <= diag && d < total; d++) filled += tileGroups[d].length;
+                    setHudProgress(filled, tileTotal);
+                    lastDiag = diag;
+                }, 30);
             }
 
             // 阶段 B~E：结果 → 消格 → 状态条拉开 → 终态
@@ -1107,27 +1419,38 @@
 
                 function doneA() {
                     // 结果：格子与轮廓切绿/红
+                    stopClock();
+                    setFrontier(-1);
                     stage.classList.add(ok ? 'is-ok' : 'is-fail');
                     centerText.textContent = STATUS_TEXT[result.kind] || STATUS_TEXT.fail;
                     liveRegion.textContent = ok ? '验证通过' : '验证失败';
+                    setHudProgress(tileTotal, tileTotal);
+                    setHudStage('verify', 2);
+                    setHudPrompt(ok ? 'verify ok' : 'verify failed');
                     return wait(T.color);
                 }
 
                 function stageC() {
                     stage.classList.remove('is-filling');
                     stage.classList.add('is-clearing');
+                    setHudPrompt('clear cells');
                     // 最后一层格子的 delay + 单格消失时长
                     return wait(T.tileOut + (tileDiagSpan - 1) * T.stepOut + 60);
                 }
 
                 function stageD() {
                     stage.classList.add('is-split');
-                    return wait(T.split);
+                    setHudStage(ok ? 'granted' : 'denied', 5);
+                    setHudPrompt(ok ? 'open session' : 'reject');
+                    // 拉到位后先停留，再进入终态，否则收尾动画会在到位瞬间就盖上来
+                    return wait(T.split + (ok ? T.dwellOk : T.dwellFail));
                 }
 
                 function stageE() {
+                    stopClock();
                     if (ok) {
                         // 成功：竖条继续移出，中间面板交给注入脚本过渡到 #chat
+                        setHudStage('commit', 5);
                         stage.classList.add('is-leaving');
                         return wait(T.morph).then(function () {
                             return softNavigate(
@@ -1140,9 +1463,12 @@
                     stage.classList.remove('is-split', 'is-filling', 'is-clearing',
                         'is-ok', 'is-fail', 'is-leaving');
                     tilesBuilt = false;
+                    tileGroups = [];
                     tilesBox.innerHTML = '';
                     restoreFormArea();
                     setSubmitting(false);
+                    setHudStage('boot', 0);
+                    setHudProgress(0, 0);
                     if (result.kind === 'net') {
                         showError('连接失败', '无法连接到服务器，请检查网络');
                     } else {
