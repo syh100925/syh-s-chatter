@@ -7,8 +7,10 @@
     <link rel="shortcut icon" href="{{ base_path }}/static/icon.png" type="image/x-icon" />
     <link id="highlight-theme" rel="stylesheet" href="{{ base_path }}/static/js/highlight.js/styles/atom-one-dark.min.css" />
     <link rel="stylesheet" href="{{ base_path }}/static/css/chat.css" />
-    <!-- html2canvas 用于截图 -->
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <!-- html2canvas 仅用于「截图」按钮（见 static/js/chat.js），不需要在解析阶段就绪。
+         必须加 defer：否则这个第三方 CDN 一旦慢/被墙，解析器会一直阻塞在 <head>，
+         导致登录成功后的 document.write 换档停在空白文档上（document.body 为 null）。 -->
+    <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     {{ plugin_css|safe }}
 </head>
 <body id="body">

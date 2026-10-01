@@ -852,8 +852,9 @@
         }
         .auth-center-text {
             white-space: nowrap;
-            font-size: 0.8rem;
-            letter-spacing: 4px;
+            /* 终态主状态词，用 clamp 随视口缩放：窄屏不至于溢出长方形 */
+            font-size: clamp(1rem, 2.6vw, 1.5rem);
+            letter-spacing: clamp(3px, 0.5vw, 6px);
             text-transform: uppercase;
             opacity: 0;
             transition: opacity 0.3s ease 0.15s;
