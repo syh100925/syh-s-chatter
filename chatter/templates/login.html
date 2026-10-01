@@ -22,7 +22,7 @@
             --error-glow-2: #ff4444;
             --ok-color: #4caf50;
             /* 格子标号色：与格子前景色/状态色反色，深底用浅字、浅底用深字 */
-            --auth-label-color: rgba(255, 255, 255, 0.72);
+            --auth-label-color: rgba(0, 0, 0, 0.74);
             --font-mono: 'Jetbrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
             --transition-speed: 0.2s;
             --glow-text-1: #ffffff;
@@ -43,7 +43,7 @@
             --error-glow-1: #d32f2f;
             --error-glow-2: #b71c1c;
             --ok-color: #2e7d32;
-            --auth-label-color: rgba(0, 0, 0, 0.58);
+            --auth-label-color: rgba(255, 255, 255, 0.82);
             --glow-text-1: #1a1a1a;
             --glow-text-2: #666666;
         }
@@ -748,6 +748,12 @@
         .auth-stage.is-fail .auth-tile {
             background: var(--error-color);
         }
+        /* 格子变成绿/红底后，原标号色（亮色主题为浅色）在红绿上只有 2.3:1，
+           几乎看不见；此处统一改为深色，两个主题都有约 5.8:1 */
+        .auth-stage.is-ok .auth-tile-label,
+        .auth-stage.is-fail .auth-tile-label {
+            color: rgba(0, 0, 0, 0.78);
+        }
 
         /* 状态条：自长方形中点向左右两边拉开；两条竖直细长长方形。
            定位在 .auth-frame-wrap 内，故 left:50% 即长方形中点，
@@ -1133,7 +1139,10 @@
                 color: 300,      // 结果换色
                 split: 500,      // 状态条拉开
                 morph: 450,      // 终态过渡
-                minRun: 1150,    // 结果回来后至少停留这么久再变色
+                minRun: 1150,    // 点击后至少这么久才允许变色
+                // 格子全部铺满后再停留这么久才开始消格——铺满到变色之间必须留出
+                // 可读的静止时间，否则「铺满」这一帧几乎看不到就被收走
+                holdFull: 1000,
                 // 状态条拉到位后的停留：失败时结果页会盖住舞台，若不留停留时间，
                 // 「拉到位」这一帧还没被看到就被 ACCESS DENIED / LOCKED 盖掉
                 dwellFail: 900,
@@ -1153,6 +1162,8 @@
             var tilesBuilt = false;
             var tileDiagSpan = 1;   // 对角层数，用于精确推算消格总时长
             var tileTotal = 0;      // 格子总数，供 HUD 计数
+            var fillSpanMs = 0;     // 铺满整片所需时长
+            var fillStartAt = 0;    // 铺开动画开始的时刻
             var tileGroups = [];    // 按对角层分组的格子，供高亮前沿带
             var clockIv = null;
 
@@ -1246,6 +1257,8 @@
                 var cols = Math.max(1, Math.round((frameW + T.gap) / (T.cell + T.gap)));
                 var rows = Math.max(1, Math.round((frameH + T.gap) / (T.cell + T.gap)));
                 tileDiagSpan = Math.max(rows - 1, cols - 1) + 1;
+                // 铺满所需时长：最后一层对角线的错峰 + 单格淡入
+                fillSpanMs = (tileDiagSpan - 1) * T.stepIn + T.tileIn;
                 // 标号字号按实际格宽收窄：格子有 overflow:hidden，字号固定时
                 // 「R11·C11」在窄格子里会被裁掉，等于没有编号
                 var cellW = (frameW - (cols - 1) * T.gap) / cols;
@@ -1419,6 +1432,7 @@
                 // 就已是 opacity:1，过渡不会发生——表现为所有格子同时出现。
                 void tilesBox.offsetWidth;
                 stage.classList.add('is-filling');
+                fillStartAt = Date.now();
                 liveRegion.textContent = '正在验证';
                 setHudStage('load', 1);
                 setHudPrompt('load cells');
@@ -1507,7 +1521,16 @@
                     passwordInput.focus();
                 }
 
-                return wait(Math.max(0, T.minRun - (Date.now() - started)))
+                // 「铺满 → 变色 → 消格」两个下限：
+                //   holdFull 从铺满那一刻起算（fillStartAt + fillSpanMs）
+                //   minRun   从点击那一刻起算
+                // 取两者较晚者，保证铺满后至少静止 holdFull 才允许收走格子。
+                var colorNotBefore = Math.max(
+                    started + T.minRun,
+                    fillStartAt + fillSpanMs + T.holdFull
+                );
+
+                return wait(Math.max(0, colorNotBefore - Date.now()))
                     .then(doneA)
                     .then(stageC)
                     .then(stageD)
