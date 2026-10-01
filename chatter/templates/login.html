@@ -491,7 +491,10 @@
             --auth-bar-w: 6px;
             --auth-bar-h: 64px;
             /* HUD 框架 */
-            --auth-hud-side-w: 92px;
+            /* HUD 右侧仪表盘宽度：要放得下流水线 + 遥测 + 事件流三块，
+               92px 只能塞下 5 个单词。宽了以后长方形由 flex-shrink 吸收，
+               窄屏则整块隐藏（见响应式段）。 */
+            --auth-hud-side-w: 208px;
             --auth-hud-fg: var(--fg-secondary);
             --auth-hud-dim: var(--fg-muted);
             --auth-tile-radius: 2px;
@@ -641,17 +644,6 @@
             border-left: 1px solid var(--border-color);
             padding-left: 8px;
         }
-        .auth-hud-item {
-            font-size: 0.6rem;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: var(--fg-muted);
-            opacity: 0.4;
-            border-left: 2px solid transparent;
-            padding-left: 6px;
-            transition: color 0.3s ease, opacity 0.3s ease,
-                border-color 0.3s ease;
-        }
         .auth-hud-item.lit {
             color: var(--auth-hud-fg);
             opacity: 1;
@@ -667,6 +659,166 @@
         .auth-stage.is-fail .auth-hud-item.active {
             border-left-color: var(--error-color);
             color: var(--error-color);
+        }
+
+        /* ---- 右侧仪表盘：流水线 / 遥测 / 事件流 三个区块 ---- */
+        .hud-block + .hud-block {
+            margin-top: 12px;
+        }
+        .hud-block-h {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.52rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            opacity: 0.75;
+            padding-bottom: 4px;
+            margin-bottom: 5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .hud-block-h::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+            opacity: 0.6;
+        }
+        /* 流水线：名称左对齐、状态码右对齐 */
+        .hud-pipe {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .hud-pipe-row {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+        .auth-hud-item {
+            font-size: 0.58rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            opacity: 0.4;
+            border-left: 2px solid transparent;
+            padding-left: 6px;
+            transition: color 0.3s ease, opacity 0.3s ease,
+                border-color 0.3s ease;
+        }
+        /* 每个流水线阶段的右侧状态码 */
+        .hud-code {
+            margin-left: auto;
+            font-size: 0.52rem;
+            letter-spacing: 1px;
+            color: var(--fg-muted);
+            opacity: 0.55;
+            font-variant-numeric: tabular-nums;
+        }
+        .auth-hud-item.lit + .hud-code {
+            color: var(--auth-hud-fg);
+            opacity: 0.9;
+        }
+        .auth-stage.is-ok .auth-hud-item.active + .hud-code {
+            color: var(--ok-color);
+            opacity: 1;
+        }
+        .auth-stage.is-fail .auth-hud-item.active + .hud-code {
+            color: var(--error-color);
+            opacity: 1;
+        }
+        /* 遥测：键值两列 */
+        .hud-tele {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .hud-tele-row {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            font-size: 0.54rem;
+            letter-spacing: 1px;
+            line-height: 1.5;
+        }
+        .hud-tele-k {
+            color: var(--fg-muted);
+            opacity: 0.7;
+            text-transform: uppercase;
+        }
+        .hud-tele-v {
+            margin-left: auto;
+            color: var(--auth-hud-fg);
+            font-variant-numeric: tabular-nums;
+        }
+        .hud-tele-v.dim {
+            color: var(--fg-muted);
+            opacity: 0.6;
+        }
+        /* 微型条形：给遥测项配一个可视化，不只是文字 */
+        .hud-mini {
+            position: relative;
+            flex: 0 0 26px;
+            height: 3px;
+            background: var(--bg-secondary);
+        }
+        .hud-mini > i {
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 0;
+            background: var(--auth-hud-fg);
+            transition: width 0.2s ease, background-color 0.3s ease;
+        }
+        .auth-stage.is-ok .hud-mini > i {
+            background: var(--ok-color);
+        }
+        .auth-stage.is-fail .hud-mini > i {
+            background: var(--error-color);
+        }
+        /* 事件流：时间戳 + 文本，超出高度时裁掉最早的 */
+        .hud-evlog {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            overflow: hidden;
+            height: 74px;
+        }
+        .hud-ev {
+            display: flex;
+            gap: 6px;
+            font-size: 0.52rem;
+            line-height: 1.45;
+            letter-spacing: 0.5px;
+            color: var(--fg-muted);
+            white-space: nowrap;
+            animation: hudEvIn 0.25s ease;
+        }
+        .hud-ev b {
+            flex: 0 0 auto;
+            font-weight: normal;
+            color: var(--fg-muted);
+            opacity: 0.65;
+            font-variant-numeric: tabular-nums;
+        }
+        .hud-ev.ok {
+            color: var(--ok-color);
+        }
+        .hud-ev.err {
+            color: var(--error-color);
+        }
+        @keyframes hudEvIn {
+            from {
+                opacity: 0;
+                transform: translateX(-4px);
+            }
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+        .auth-stage.active .hud-ev {
+            animation: none;
         }
 
         /* ---- HUD 底部框架行：计数文本 + 进度条 + 提示 ---- */
@@ -1141,12 +1293,36 @@
                         </div>
                     </div>
                 </div>
+                <!-- 右侧仪表盘：流水线状态 + 遥测读数 + 事件流 -->
                 <div class="auth-hud-side" id="authSide">
-                    <span class="auth-hud-item" data-k="load">load</span>
-                    <span class="auth-hud-item" data-k="verify">verify</span>
-                    <span class="auth-hud-item" data-k="sync">sync</span>
-                    <span class="auth-hud-item" data-k="render">render</span>
-                    <span class="auth-hud-item" data-k="commit">commit</span>
+                    <div class="hud-block">
+                        <div class="hud-block-h">pipeline</div>
+                        <div class="hud-pipe">
+                            <div class="hud-pipe-row"><span class="auth-hud-item" data-k="load">load</span><span class="hud-code" data-code="load">--</span></div>
+                            <div class="hud-pipe-row"><span class="auth-hud-item" data-k="verify">verify</span><span class="hud-code" data-code="verify">--</span></div>
+                            <div class="hud-pipe-row"><span class="auth-hud-item" data-k="sync">sync</span><span class="hud-code" data-code="sync">--</span></div>
+                            <div class="hud-pipe-row"><span class="auth-hud-item" data-k="render">render</span><span class="hud-code" data-code="render">--</span></div>
+                            <div class="hud-pipe-row"><span class="auth-hud-item" data-k="commit">commit</span><span class="hud-code" data-code="commit">--</span></div>
+                        </div>
+                    </div>
+
+                    <div class="hud-block">
+                        <div class="hud-block-h">telemetry</div>
+                        <div class="hud-tele">
+                            <div class="hud-tele-row"><span class="hud-tele-k">cells</span><span class="hud-mini"><i id="telMiniFill"></i></span><span class="hud-tele-v" id="telCells">000/000</span></div>
+                            <div class="hud-tele-row"><span class="hud-tele-k">diag</span><span class="hud-tele-v" id="telDiag">--/--</span></div>
+                            <div class="hud-tele-row"><span class="hud-tele-k">frontier</span><span class="hud-tele-v" id="telFrontier">--</span></div>
+                            <div class="hud-tele-row"><span class="hud-tele-k">grid</span><span class="hud-tele-v" id="telGrid">--x--</span></div>
+                            <div class="hud-tele-row"><span class="hud-tele-k">cell</span><span class="hud-tele-v" id="telCell">--px</span></div>
+                            <div class="hud-tele-row"><span class="hud-tele-k">rtt</span><span class="hud-tele-v dim" id="telRtt">--</span></div>
+                            <div class="hud-tele-row"><span class="hud-tele-k">digest</span><span class="hud-tele-v dim" id="telDigest">0x0000</span></div>
+                        </div>
+                    </div>
+
+                    <div class="hud-block">
+                        <div class="hud-block-h">events</div>
+                        <div class="hud-evlog" id="hudEventLog"></div>
+                    </div>
                 </div>
             </div>
 
@@ -1197,6 +1373,22 @@
             var sideItems = document.getElementById('authSide')
                 ? document.getElementById('authSide').querySelectorAll('.auth-hud-item')
                 : [];
+            // 右侧仪表盘：流水线状态码 / 遥测读数 / 事件流
+            var sideCodes = document.getElementById('authSide')
+                ? document.getElementById('authSide').querySelectorAll('.hud-code')
+                : [];
+            var telEls = {
+                cells: document.getElementById('telCells'),
+                diag: document.getElementById('telDiag'),
+                frontier: document.getElementById('telFrontier'),
+                grid: document.getElementById('telGrid'),
+                cell: document.getElementById('telCell'),
+                rtt: document.getElementById('telRtt'),
+                digest: document.getElementById('telDigest'),
+                miniFill: document.getElementById('telMiniFill')
+            };
+            var evLog = document.getElementById('hudEventLog');
+            var EV_MAX = 7;
 
             // ---- 动画时序（毫秒）----
             // 标号窗口占单格的比例（右上角）。CSS 里也写了同样的值作兜底，
@@ -1273,7 +1465,45 @@
                     var lit = i < litCount;
                     sideItems[i].classList.toggle('lit', lit);
                     sideItems[i].classList.toggle('active', i === litCount - 1 && lit);
+                    // 走过的阶段给一个状态码，取代原先只有亮/灭两种状态
+                    if (sideCodes[i]) {
+                        sideCodes[i].textContent = lit
+                            ? '0x' + (0x10 + i * 0x7).toString(16).toUpperCase()
+                            : '--';
+                    }
                 }
+            }
+
+            // ---- 右侧仪表盘 ----
+
+            // 事件流：追加一条带时间戳的记录，超出高度就挤掉最早一条
+            function logEvent(text, kind) {
+                if (!evLog) return;
+                var row = document.createElement('div');
+                row.className = 'hud-ev' + (kind ? ' ' + kind : '');
+                var ts = document.createElement('b');
+                ts.textContent = hudClock ? hudClock.textContent : '00:00.0';
+                row.appendChild(ts);
+                row.appendChild(document.createTextNode(text));
+                evLog.appendChild(row);
+                while (evLog.children.length > EV_MAX) {
+                    evLog.removeChild(evLog.firstChild);
+                }
+            }
+
+            function setTel(key, text) {
+                var el = telEls[key];
+                if (el) el.textContent = text;
+            }
+
+            // 读数由已铺开的格子数派生：不是随机数，同一次铺开过程可复现，
+            // 但又不是恒定值，看起来像在校验什么
+            function updateDigest(filled, total) {
+                var el = telEls.digest;
+                if (!el) return;
+                // 提逊当前进度掺进去，否则铺定后会固定成一个值、看着像卡住了。
+                var h = (0x811c ^ (filled * 0x9e37) ^ ((total || 0) << 8)) >>> 0;
+                el.textContent = '0x' + (h & 0xffff).toString(16).toUpperCase().padStart(4, '0');
             }
 
             function setHudProgress(filled, total) {
@@ -1283,6 +1513,10 @@
                 var w = pct + '%';
                 progressFill.style.width = w;
                 trackFill.style.width = w;
+                // 同步右侧遥测：格子计数 + 两根微型条
+                setTel('cells', pad(filled, 3) + '/' + pad(total, 3));
+                if (telEls.miniFill) telEls.miniFill.style.width = w;
+                updateDigest(filled, total);
             }
 
             function setHudPrompt(text) {
@@ -1319,7 +1553,11 @@
 
             // 高亮正在铺开的那条对角前沿带
             function setFrontier(diag) {
-                if (diag < 0 || diag >= tileGroups.length) return;
+                if (diag < 0 || diag >= tileGroups.length) {
+                    setTel('frontier', '--');
+                    return;
+                }
+                setTel('frontier', pad(diag + 1, 2) + '/' + pad(tileDiagSpan, 2));
                 for (var d = 0; d < tileGroups.length; d++) {
                     var on = (d === diag);
                     var g = tileGroups[d];
@@ -1403,6 +1641,9 @@
                 }
                 tileTotal = cols * rows;
                 setHudProgress(0, tileTotal);
+                setTel('grid', rows + 'x' + cols);
+                setTel('cell', Math.round(cellW) + '+' + T.gap);
+                setTel('diag', tileDiagSpan + '/' + tileDiagSpan);
                 tilesBuilt = true;
             }
 
@@ -1585,6 +1826,7 @@
                 liveRegion.textContent = '正在验证';
                 setHudStage('load', 1);
                 setHudPrompt('load cells');
+                logEvent('fill ' + tileTotal + ' cells');
                 startClock();
                 // 前沿带跟随对角错峰推进，计数与进度条同步
                 var total = tileDiagSpan;
@@ -1624,6 +1866,7 @@
                     liveRegion.textContent = ok ? '验证通过' : '验证失败';
                     setHudProgress(tileTotal, tileTotal);
                     setHudStage('verify', 2);
+                    logEvent('verify ' + (ok ? 'granted' : 'denied'), ok ? 'ok' : 'err');
                     setHudPrompt(ok ? 'hold · session open' : 'hold · rejected');
                     return wait(T.color);
                 }
@@ -1632,6 +1875,7 @@
                     stage.classList.remove('is-filling');
                     stage.classList.add('is-clearing');
                     setHudPrompt('clear cells');
+                    logEvent('clear ' + tileTotal + ' cells');
                     // 最后一层格子的 delay + 单格消失时长
                     return wait(T.tileOut + (tileDiagSpan - 1) * T.stepOut + 60);
                 }
@@ -1649,6 +1893,7 @@
                     if (ok) {
                         // 成功：竖条继续移出，中间面板交给注入脚本过渡到 #chat
                         setHudStage('commit', 5);
+                        logEvent('commit open session');
                         stage.classList.add('is-leaving');
                         return wait(T.morph).then(function () {
                             return softNavigate(
@@ -1660,6 +1905,7 @@
                     // 不弹旧故障页、也不还原表单（表单保持隐藏），只在状态框下方
                     // 弹出 Retry。
                     setHudStage('denied', 5);
+                    logEvent('commit lock session', 'err');
                     setHudPrompt(result.kind === 'net' ? 'retry' : 'locked · retry');
                     setSubmitting(false);
                     passwordInput.value = '';
@@ -1680,6 +1926,8 @@
 
             // 发送登录请求（统一出口，供动画路径与 reduced-motion 降级路径复用）
             function sendLogin(username, password) {
+                var sentAt = Date.now();
+                logEvent('req ' + username + ' \u2192 /login');
                 return fetch(BASE_PATH + '/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1691,11 +1939,16 @@
                         return { ok: false, data: {} };
                     });
                 }).then(function (res) {
+                    setTel('rtt', (Date.now() - sentAt) + 'ms');
                     if (res.ok && res.data.update) {
+                        logEvent('res 200 grant', 'ok');
                         return { kind: 'ok', token: res.data.update };
                     }
+                    logEvent('res 403 deny', 'err');
                     return { kind: 'fail' };
                 }).catch(function () {
+                    setTel('rtt', 'timeout');
+                    logEvent('res -- unreachable', 'err');
                     return { kind: 'net' };
                 });
             }
