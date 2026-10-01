@@ -1129,9 +1129,9 @@
                 gap: 4,          // 格子间隙，与 --auth-tile-gap 保持一致
                 tileIn: 280,     // 单格淡入
                 tileOut: 240,    // 单格消失
-                // 每层对角线的错峰。取值决定「依次出现」是否看得见：
-                // 对角层数约 = max(rows,cols)，错峰过小（如 5ms）整场铺满不到
-                // 100ms，肉眼只会看到所有格子同时出现。
+                // 每层对角线的错峰。取值决定「依次出现 / 逐个消失」是否看得见：
+                // 对角层数约 = max(rows,cols)，错峰过小（如 5ms）整场不到
+                // 100ms，肉眼只会看到所有格子同时出现/消失。
                 stepIn: 30,
                 stepOut: 18,
                 frame: 450,      // 长方形缩放展开
@@ -1140,9 +1140,10 @@
                 split: 500,      // 状态条拉开
                 morph: 450,      // 终态过渡
                 minRun: 1150,    // 点击后至少这么久才允许变色
-                // 格子全部铺满后再停留这么久才开始消格——铺满到变色之间必须留出
-                // 可读的静止时间，否则「铺满」这一帧几乎看不到就被收走
-                holdFull: 1000,
+                // 变色完成之后再停留这么久才开始消格。位置很关键：要停在
+                // 「红/绿已铺满」这个状态上留出可读的静止时间，而不是停在
+                // 变色之前（那样只是白等，且看不到状态色）。
+                holdPause: 1000,
                 // 状态条拉到位后的停留：失败时结果页会盖住舞台，若不留停留时间，
                 // 「拉到位」这一帧还没被看到就被 ACCESS DENIED / LOCKED 盖掉
                 dwellFail: 900,
@@ -1469,7 +1470,7 @@
                     liveRegion.textContent = ok ? '验证通过' : '验证失败';
                     setHudProgress(tileTotal, tileTotal);
                     setHudStage('verify', 2);
-                    setHudPrompt(ok ? 'verify ok' : 'verify failed');
+                    setHudPrompt(ok ? 'hold · session open' : 'hold · rejected');
                     return wait(T.color);
                 }
 
@@ -1521,18 +1522,19 @@
                     passwordInput.focus();
                 }
 
-                // 「铺满 → 变色 → 消格」两个下限：
-                //   holdFull 从铺满那一刻起算（fillStartAt + fillSpanMs）
-                //   minRun   从点击那一刻起算
-                // 取两者较晚者，保证铺满后至少静止 holdFull 才允许收走格子。
+                // 变色不得早于：点击 + minRun，或铺满那一刻（取较晚者）。
+                // 真正的「停留」在 doneA 之后单独一段（holdPause）。
                 var colorNotBefore = Math.max(
                     started + T.minRun,
-                    fillStartAt + fillSpanMs + T.holdFull
+                    fillStartAt + fillSpanMs
                 );
 
                 return wait(Math.max(0, colorNotBefore - Date.now()))
-                    .then(doneA)
-                    .then(stageC)
+                    .then(doneA)                       // 变色，并等颜色过渡走完
+                    .then(function () {                // 变色完成后停留片刻
+                        return wait(T.holdPause);
+                    })
+                    .then(stageC)                      // 然后才逐格消失
                     .then(stageD)
                     .then(stageE);
             }
