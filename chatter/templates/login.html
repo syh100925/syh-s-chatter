@@ -1718,11 +1718,22 @@
                     + '#auth-morph-center{position:absolute;background:var(--bg-primary);'
                     + 'transform-origin:center center;transition:none}'
                     + '@media (prefers-reduced-motion: reduce){ #auth-morph-center{transition:none}}'
+                    // morph 期间把聊天室的浮层整体压住。#chat 之外的浮层
+                    // （主题/工具/外观按钮、tools-modal 遮罩、终端、boot-line…）
+                    // 都是 position:fixed 且 z-index 高达 6000~9999，而 morph
+                    // 面板只覆盖 #chat 的矩形，于是它们会在「面板生长到落位」这
+                    // 段时间里先于内容出现——看上去就是切换中间闪出一堆菜单。
+                    // 用一个置顶的 inert 遮罩把整屏盖住，面板在其上方生长；
+                    // 撤罩时遮罩与面板同一同步块移除，不会多出一帧。
+                    + '#auth-morph-veil{position:fixed;inset:0;z-index:10000;'
+                    + 'background:var(--bg-primary);pointer-events:none}'
                     + '</style>'
+                    + '<div id="auth-morph-veil" aria-hidden="true"></div>'
                     + '<div id="auth-morph-stage" aria-hidden="true">'
                     + '<div id="auth-morph-center"></div></div>'
                     + '<script>(function(){var d=document.getElementById("auth-morph-center");'
                     + 'var s=document.getElementById("auth-morph-stage");'
+                    + 'var v=document.getElementById("auth-morph-veil");'
                     + 'function place(sel,anim){var t=document.querySelector(sel);'
                     + 'if(!t){return false;}var r=t.getBoundingClientRect();'
                     + 'if(!r.width||!r.height){return false;}'
@@ -1755,8 +1766,11 @@
                     // 记录对齐后的最终矩形，便于验证「撤罩时确实盖住了真实 #chat」
                     + 'window.__AUTH_MORPH_FINAL={l:Math.round(r.left),t:Math.round(r.top),'
                     + 'w:Math.round(r.width),h:Math.round(r.height)};}'
-                    + 's.remove();},'+ T.morph + '+60);}'
-                    + 'else{s.remove();}}'
+                    // 面板已对齐到真实 #chat，此时撤掉整屏遮罩与面板：
+                    // 两者都在同一同步块内移除，中间不会多出一帧，
+                    // 露出的就是已经就位的聊天室。
+                    + 's.remove();if(v){v.remove();}},'+ T.morph + '+60);}'
+                    + 'else{s.remove();if(v){v.remove();}}}'
                     + 'if(document.readyState==="loading"){'
                     + 'document.addEventListener("DOMContentLoaded",run);}else{run();}'
                     + '})();<\/script>';
