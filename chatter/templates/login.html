@@ -738,19 +738,20 @@
         .auth-stage.is-fail .auth-tile.frontier {
             box-shadow: inset 0 0 0 1px #ffffff;
         }
-        /* 行列标号：与格子底色反色，保证初始前景色与绿/红状态下都清晰。
-           拆成 R / C 两行（而非一行「R11·C11」）：单行时最宽的记号是 7 个字符，
-           34px 的格子放不下超过 ~8px 的字号；拆行后最宽只有 3 个字符，
-           字号可以放大到 ~12px 才不溢出。字号由 JS 按实际格宽格高内联计算
-           （这里只给兜底值）。 */
+        /* 行列标号：钉在单格右上角的一个小窗口，宽 = 格宽 35%、高 = 格高 60%，
+           里面竖排 R / C 两行。与格子底色反色，保证初始前景色与绿/红状态下都清晰。
+           字号由 JS 按这个窗口的实际尺寸内联计算（这里只给兜底值）。 */
         .auth-tile-label {
             position: absolute;
-            inset: 0;
+            top: 0;
+            right: 0;
+            width: 35%;
+            height: 60%;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 6.4px;
             line-height: 1.05;
             letter-spacing: 0;
             color: var(--auth-label-color);
@@ -1196,6 +1197,11 @@
                 : [];
 
             // ---- 动画时序（毫秒）----
+            // 标号窗口占单格的比例（右上角）。CSS 里也写了同样的值作兜底，
+            // 但真正生效的是这里内联出去的 width/height，两处不会走偏。
+            var LBL_BOX_W = 0.35;
+            var LBL_BOX_H = 0.60;
+
             var T = {
                 cell: 34,        // 格子边长（不含间隙）
                 gap: 4,          // 格子间隙，与 --auth-tile-gap 保持一致
@@ -1332,16 +1338,19 @@
                 tileDiagSpan = Math.max(rows - 1, cols - 1) + 1;
                 // 铺满所需时长：最后一层对角线的错峰 + 单格淡入
                 fillSpanMs = (tileDiagSpan - 1) * T.stepIn + T.tileIn;
-                // 标号字号同时受格宽与格高约束（拆成 R / C 两行后）：
-                //   格宽：最宽记号是「R11」这类 3 字符，等宽字 advance≈0.6em
-                //   格高：两行 × line-height(1.05)
-                // 两个约束取小者，再夹到 [6,12]px。
+                // 标号窗口 = 单格右上角 35% 宽 × 60% 高（见 CSS），字号按这个窗口算，
+                // 而不是按整格算：窗口宽只有格宽的 35%（34px 格 → 约 12px），
+                // 而 R11 这类 3 字符记号在 12px 内最多只能到 ~6.4px。
+                //   格宽约束：最宽记号 widest 字符 × 等宽 advance≈0.6em
+                //   格高约束：两行 × line-height(1.05)
                 var cellW = (frameW - (cols - 1) * T.gap) / cols;
                 var cellH = (frameH - (rows - 1) * T.gap) / rows;
+                var boxW = cellW * LBL_BOX_W;
+                var boxH = cellH * LBL_BOX_H;
                 var widest = String(Math.max(rows, cols)).length + 1;   // 'R' + 位数
-                var fsByW = (cellW - 4) / (widest * 0.6);
-                var fsByH = (cellH - 3) / (2 * 1.05);
-                var labelFs = Math.max(6, Math.min(12, fsByW, fsByH)).toFixed(2);
+                var fsByW = (boxW - 0.5) / (widest * 0.6);
+                var fsByH = (boxH - 0.5) / (2 * 1.05);
+                var labelFs = Math.max(4, Math.min(12, fsByW, fsByH)).toFixed(2);
                 var html = '';
 
                 for (var r = 0; r < rows; r++) {
@@ -1355,7 +1364,9 @@
                             + '" style="transition-delay:'
                             + dIn + 'ms,' + dIn + 'ms,' + dOut + 'ms">'
                             + '<span class="auth-tile-label" title="' + label
-                            + '" style="font-size:' + labelFs + 'px">'
+                            + '" style="font-size:' + labelFs + 'px;width:'
+                            + (LBL_BOX_W * 100) + '%;height:'
+                            + (LBL_BOX_H * 100) + '%">'
                             + '<i>R' + (r + 1) + '</i><i>C' + (c + 1) + '</i>'
                             + '</span>'
                             + '</div>';
