@@ -479,8 +479,9 @@
             --auth-frame-h: min(460px, 52vh);
             /* 格子间隙与状态条尺寸独立于窗口，二者各自用变量控制 */
             --auth-tile-gap: 4px;
-            --auth-bar-w: 1px;
-            --auth-bar-h: 96px;
+            /* 状态条尺寸：两个小竖直长方形 */
+            --auth-bar-w: 6px;
+            --auth-bar-h: 64px;
             /* HUD 框架 */
             --auth-hud-side-w: 92px;
             --auth-hud-fg: var(--fg-secondary);
@@ -587,11 +588,19 @@
             gap: 12px;
         }
 
-        /* 长方型窗口：格子容器 */
-        .auth-frame {
+        /* 长方型窗口 + 状态条的共同定位层。
+           右侧状态列表让长方形并不在视口正中，所以状态条不能按 50vw 算，
+           要放进这个与长方形同尺寸的包裹层，用长方形自身宽度定位边界。 */
+        .auth-frame-wrap {
             position: relative;
             width: var(--auth-frame-w);
             height: var(--auth-frame-h);
+        }
+
+        /* 长方型窗口：格子容器 */
+        .auth-frame {
+            position: absolute;
+            inset: 0;
             background: var(--bg-primary);
             border: 1px solid var(--border-color);
             overflow: hidden;
@@ -739,29 +748,33 @@
             background: var(--error-color);
         }
 
-        /* 状态条：自屏幕中点向左右两边拉开；两条竖直细长长方形。
-           挂在 .auth-stage（全屏）下，故 left:50% 即视口中点；
-           高度与长方形窗口一致（不铺满屏幕），用 margin 负值做垂直居中，
-           以免 translate 被水平位移占掉 */
+        /* 状态条：自长方形中点向左右两边拉开；两条竖直细长长方形。
+           定位在 .auth-frame-wrap 内，故 left:50% 即长方形中点，
+           边界也用长方形自身宽度而不是屏幕宽度。
+           高度用 margin 负值做垂直居中，以免 translate 被水平位移占掉。 */
         .auth-bar {
             position: absolute;
             top: 50%;
             left: 50%;
+            /* 高于中间面板：面板是不透明的，且现在两者都落在长方形范围内 */
+            z-index: 2;
             width: var(--auth-bar-w);
             height: var(--auth-bar-h);
             margin-top: calc(var(--auth-bar-h) / -2);
             opacity: 0;
-            background: var(--fg-muted);
+            /* 本体只比页面底色亮一档；状态色交给描边 */
+            background: var(--bg-secondary);
+            border: 1px solid var(--fg-muted);
             transition: transform 0.5s ease, opacity 0.3s ease,
-                background-color 0.3s ease;
+                border-color 0.3s ease;
         }
         .auth-stage.is-ok .auth-bar {
-            background: var(--ok-color);
+            border-color: var(--ok-color);
         }
         .auth-stage.is-fail .auth-bar {
-            background: var(--error-color);
+            border-color: var(--error-color);
         }
-        /* 未拉开时两条贴合在舞台中点 */
+        /* 未拉开时两条贴合在长方形中点 */
         .auth-bar-l {
             transform: translateX(-100%);
         }
@@ -771,37 +784,38 @@
         .auth-stage.is-split .auth-bar {
             opacity: 1;
         }
-        /* 两条停在屏幕左右边缘内侧 6px。
-           注意：left:50% 定位的是条的左边，故右条要减去自身宽度与内缩量，
-           否则会停在 vw~vw+1px 处（视口外，完全看不见）。 */
+        /* 两条停在长方形左右边缘内侧 8px（不贴屏幕边）。
+           left:50% 定位的是条的左边，故右条需减去自身宽度。 */
         .auth-stage.is-split .auth-bar-l {
-            transform: translateX(calc(-50vw + 6px));
+            transform: translateX(calc(var(--auth-frame-w) / -2 + 8px));
         }
         .auth-stage.is-split .auth-bar-r {
-            transform: translateX(calc(50vw - 6px - var(--auth-bar-w)));
+            transform: translateX(calc(var(--auth-frame-w) / 2 - 8px - var(--auth-bar-w)));
         }
-        /* 成功终态：两条竖条继续 ease 移出舞台 */
+        /* 成功终态：两条竖条继续 ease 移出长方形 */
         .auth-stage.is-leaving .auth-bar-l {
-            transform: translateX(-110vw);
+            transform: translateX(calc(var(--auth-frame-w) / -2 - 40vw));
         }
         .auth-stage.is-leaving .auth-bar-r {
-            transform: translateX(110vw);
+            transform: translateX(calc(var(--auth-frame-w) / 2 + 40vw));
         }
 
         /* 中间背景色长方形：承载状态色提示信息。
-           尺寸与 .auth-frame 一致，以便长方形那圈状态色轮廓在状态条阶段仍然可见 */
+           尺寸与长方形一致（内缩 1px 让长方形那圈状态色轮廓仍然可见）。
+           z-index 低于状态条，否则不透明的面板会把它们盖住。 */
         .auth-center {
             position: absolute;
-            top: 50%;
+            top: 1px;
+            bottom: 1px;
             left: 50%;
-            width: var(--auth-frame-w);
-            height: var(--auth-frame-h);
+            width: 100%;
+            z-index: 1;
             overflow: hidden;
             background: var(--bg-primary);
             display: flex;
             align-items: center;
             justify-content: center;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
             opacity: 0;
             transition: opacity 0.3s ease;
         }
@@ -1029,8 +1043,17 @@
 
             <!-- 主体：长方形格子窗口 + 右侧状态列表 -->
             <div class="auth-hud-body">
-                <div class="auth-frame" id="authFrame">
-                    <div class="auth-tiles" id="authTiles"></div>
+                <div class="auth-frame-wrap">
+                    <div class="auth-frame" id="authFrame">
+                        <div class="auth-tiles" id="authTiles"></div>
+                    </div>
+                    <!-- 状态条与中间面板放在长方形包裹层内：边界按长方形宽度算，
+                         且不受 .auth-frame 的 overflow:hidden 裁切 -->
+                    <div class="auth-bar auth-bar-l" id="authBarL"></div>
+                    <div class="auth-bar auth-bar-r" id="authBarR"></div>
+                    <div class="auth-center" id="authCenter">
+                        <span class="auth-center-text" id="authCenterText"></span>
+                    </div>
                 </div>
                 <div class="auth-hud-side" id="authSide">
                     <span class="auth-hud-item" data-k="load">load</span>
@@ -1047,14 +1070,6 @@
                 <span class="auth-progress"><i class="auth-progress-fill" id="authProgressFill"></i></span>
                 <span class="auth-hud-prompt" id="authHudPrompt">&gt;_</span>
             </div>
-        </div>
-
-        <!-- 状态条与中间面板挂在舞台而非长方形上：长方形 overflow:hidden 会裁掉它们，
-             导致「向两边拉开」看不见 -->
-        <div class="auth-bar auth-bar-l" id="authBarL"></div>
-        <div class="auth-bar auth-bar-r" id="authBarR"></div>
-        <div class="auth-center" id="authCenter">
-            <span class="auth-center-text" id="authCenterText"></span>
         </div>
     </div>
     <p class="auth-live" id="authLive" role="status" aria-live="polite"></p>
