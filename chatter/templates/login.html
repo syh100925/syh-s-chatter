@@ -515,6 +515,8 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            /* 兜底上限：窄屏下不允许超出视口。桌面端内容更窄，不受影响 */
+            max-width: calc(100vw - 32px);
             transform: scale(0.18);
             opacity: 0;
             transition: transform 0.45s ease, opacity 0.45s ease;
@@ -600,6 +602,11 @@
         .auth-frame-wrap {
             position: relative;
             width: var(--auth-frame-w);
+            /* 可收缩：长方形(88vw) + 右侧状态列表(92px) + 间隙(12px) 在 640~900px
+               之间会超过视口，靠 flex-shrink 吸收多余宽度，而不是写死减法。
+               min-width:0 是必需的，否则 flex 项不会缩到 width 以下。 */
+            flex: 0 1 auto;
+            min-width: 0;
             height: var(--auth-frame-h);
         }
 
@@ -623,6 +630,8 @@
         /* ---- HUD 右侧状态列表：逐条点亮 ---- */
         .auth-hud-side {
             width: var(--auth-hud-side-w);
+            /* 不参与收缩：状态列表保持可读，宽度让给长方形 */
+            flex: 0 0 auto;
             display: flex;
             flex-direction: column;
             justify-content: flex-start;
@@ -730,19 +739,28 @@
             box-shadow: inset 0 0 0 1px #ffffff;
         }
         /* 行列标号：与格子底色反色，保证初始前景色与绿/红状态下都清晰。
-           字号由 JS 按实际格宽内联设置（这里只给兜底值） */
+           拆成 R / C 两行（而非一行「R11·C11」）：单行时最宽的记号是 7 个字符，
+           34px 的格子放不下超过 ~8px 的字号；拆行后最宽只有 3 个字符，
+           字号可以放大到 ~12px 才不溢出。字号由 JS 按实际格宽格高内联计算
+           （这里只给兜底值）。 */
         .auth-tile-label {
             position: absolute;
             inset: 0;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 8px;
-            line-height: 1;
+            font-size: 12px;
+            line-height: 1.05;
             letter-spacing: 0;
             color: var(--auth-label-color);
             white-space: nowrap;
             transition: opacity 0.18s ease;
+        }
+        /* 两行之间不留额外空隙，行高由上面的 line-height 统一控制 */
+        .auth-tile-label > i {
+            font-style: normal;
+            display: block;
         }
         .auth-stage.is-clearing .auth-tile-label {
             opacity: 0;
@@ -926,6 +944,51 @@
             .dynamic-word {
                 min-width: 60px;
                 font-size: 0.7rem;
+            }
+        }
+
+        /* ---- 窄屏 HUD：原先固定 92px 的右侧状态列表 + min(760px,88vw) 的长方形
+           合计约 434px，比视口还宽，把整个 HUD 顶出屏幕（标题被切、右侧状态列表
+           消失、格子右侧被裁）。窄屏下收起状态列表并让长方形接近满宽，
+           同一信息仍由顶部阶段词与底部提示词传达。 ---- */
+        @media (max-width: 640px) {
+            .auth-stage {
+                --auth-frame-w: calc(100vw - 32px);
+                --auth-frame-h: min(400px, 46vh);
+            }
+            .auth-hud-side {
+                display: none;
+            }
+            /* 顶部/底部行是 white-space:nowrap 的 flex：不给子项 min-width:0，
+               它们不会缩到内容以下，整行宽度就会顶破视口。 */
+            .auth-hud-row > *,
+            .auth-hud-row {
+                min-width: 0;
+            }
+            /* 刻度线是唯一可压缩项，给它一个下限即可 */
+            .auth-hud-track {
+                min-width: 24px;
+            }
+            /* 标题 argv_login·syh-cr 与字距在窄屏太占地方，收起 */
+            .auth-hud-row > span:nth-child(2) {
+                display: none;
+            }
+            .auth-hud-row,
+            .auth-hud-side {
+                font-size: 0.56rem;
+                letter-spacing: 1px;
+            }
+            .auth-hud-stage {
+                min-width: 4.5em;
+            }
+        }
+        /* 极窄（≤400px）：连刻度线也收起，避免把标题/阶段词挤没 */
+        @media (max-width: 400px) {
+            .auth-hud-track {
+                display: none;
+            }
+            .auth-stage {
+                --auth-frame-w: calc(100vw - 24px);
             }
         }
     </style>
@@ -1269,10 +1332,16 @@
                 tileDiagSpan = Math.max(rows - 1, cols - 1) + 1;
                 // 铺满所需时长：最后一层对角线的错峰 + 单格淡入
                 fillSpanMs = (tileDiagSpan - 1) * T.stepIn + T.tileIn;
-                // 标号字号按实际格宽收窄：格子有 overflow:hidden，字号固定时
-                // 「R11·C11」在窄格子里会被裁掉，等于没有编号
+                // 标号字号同时受格宽与格高约束（拆成 R / C 两行后）：
+                //   格宽：最宽记号是「R11」这类 3 字符，等宽字 advance≈0.6em
+                //   格高：两行 × line-height(1.05)
+                // 两个约束取小者，再夹到 [6,12]px。
                 var cellW = (frameW - (cols - 1) * T.gap) / cols;
-                var labelFs = Math.max(4.5, Math.min(9, cellW / 4.4)).toFixed(2);
+                var cellH = (frameH - (rows - 1) * T.gap) / rows;
+                var widest = String(Math.max(rows, cols)).length + 1;   // 'R' + 位数
+                var fsByW = (cellW - 4) / (widest * 0.6);
+                var fsByH = (cellH - 3) / (2 * 1.05);
+                var labelFs = Math.max(6, Math.min(12, fsByW, fsByH)).toFixed(2);
                 var html = '';
 
                 for (var r = 0; r < rows; r++) {
@@ -1286,7 +1355,9 @@
                             + '" style="transition-delay:'
                             + dIn + 'ms,' + dIn + 'ms,' + dOut + 'ms">'
                             + '<span class="auth-tile-label" title="' + label
-                            + '" style="font-size:' + labelFs + 'px">' + label + '</span>'
+                            + '" style="font-size:' + labelFs + 'px">'
+                            + '<i>R' + (r + 1) + '</i><i>C' + (c + 1) + '</i>'
+                            + '</span>'
                             + '</div>';
                     }
                 }
