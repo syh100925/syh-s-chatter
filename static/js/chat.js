@@ -919,6 +919,18 @@ function loadHtml2Canvas() {
                 input.focus();
             }
 
+            // 右键头像「提及」：把 @用户名 追加到输入框末尾，并保持焦点便于继续输入
+            function appendMention(username) {
+                const input = document.getElementById('upft');
+                if (!input) return;
+                const separator = input.value && !/\s$/.test(input.value) ? ' ' : '';
+                input.value += separator + '@' + username + ' ';
+                const newCursor = input.value.length;
+                input.setSelectionRange(newCursor, newCursor);
+                input.focus();
+                resizeUpft();
+            }
+
             const upft = document.getElementById('upft');
             function resizeUpft() {
                 if (!upft) return;
@@ -941,6 +953,9 @@ function loadHtml2Canvas() {
                     } else if (e.key === 'Enter' && !e.shiftKey) {
                         if (acIndex >= 0 && items[acIndex]) {
                             e.preventDefault();
+                            // 选中候选人只插入 @用户名，不能继续冒泡触发换行后的发送逻辑。
+                            // 再次按 Enter 才会发送。
+                            e.stopImmediatePropagation();
                             items[acIndex].click();
                         } else {
                             acMenu.classList.remove('active');
@@ -2323,7 +2338,7 @@ function loadHtml2Canvas() {
                 users.forEach(u => {
                     let s = (u === currentUser);
                     h +=
-                        `<span class="user-tag ${s?'self':''}"><span class="tag-avatar" style="border-color:${s?'var(--fg-primary)':'var(--border-color)'};">${u.charAt(0).toUpperCase()}</span><span class="tag-name">${u}</span></span>`;
+                        `<span class="user-tag ${s?'self':''}" data-user="${escapeHtml(u)}"><span class="tag-avatar" style="border-color:${s?'var(--fg-primary)':'var(--border-color)'};">${u.charAt(0).toUpperCase()}</span><span class="tag-name">${u}</span></span>`;
                 });
                 c.innerHTML = h;
             }
@@ -2450,9 +2465,9 @@ function loadHtml2Canvas() {
             }
 
             function openAvatarMenu(username, x, y) {
+                if (!username || username === currentUser) return;
                 const muteVisible = can('moderation.mute');
                 const unmuteVisible = can('moderation.unmute');
-                if ((!muteVisible && !unmuteVisible) || !username || username === currentUser) return;
                 document.getElementById('avatarMuteBtn').style.display = muteVisible ? 'block' : 'none';
                 document.getElementById('avatarUnmuteBtn').style.display = unmuteVisible ? 'block' : 'none';
                 contextUser = username;
@@ -2462,8 +2477,9 @@ function loadHtml2Canvas() {
             }
 
             document.getElementById('messageMenu').addEventListener('click', event => {
-                const action = event.target.dataset.action;
-                if (!action || !contextMessage) return;
+                const button = event.target.closest('button[data-action]');
+                if (!button || !contextMessage) return;
+                const action = button.dataset.action;
                 if (action === 'reply') {
                     setReplyTarget(contextMessage);
                     hideActionMenus();
@@ -2483,11 +2499,15 @@ function loadHtml2Canvas() {
             });
 
             document.getElementById('avatarMenu').addEventListener('click', event => {
-                const action = event.target.dataset.action;
+                const button = event.target.closest('button[data-action]');
+                if (!button) return;
+                const action = button.dataset.action;
                 const username = contextUser;
-                if (!action || !username) return;
+                if (!username) return;
                 hideActionMenus();
-                if (action === 'mute') {
+                if (action === 'mention') {
+                    appendMention(username);
+                } else if (action === 'mute') {
                     const answer = window.prompt('禁言时长（1-86400 秒）', '60');
                     if (answer === null) return;
                     const duration = Number.parseInt(answer, 10);
@@ -2534,6 +2554,17 @@ function loadHtml2Canvas() {
                 event.preventDefault();
                 openPointerMenu(event);
             });
+            const onlineTags = document.getElementById('userTags');
+            if (onlineTags) {
+                onlineTags.addEventListener('contextmenu', event => {
+                    const tag = event.target.closest('.user-tag');
+                    if (!tag) return;
+                    const username = tag.dataset.user;
+                    if (!username || username === currentUser) return;
+                    event.preventDefault();
+                    openAvatarMenu(username, event.clientX, event.clientY);
+                });
+            }
             messageList.addEventListener('pointerdown', event => {
                 if (event.pointerType !== 'touch') return;
                 const target = event.target.closest('.message-bubble, .msg-avatar');
